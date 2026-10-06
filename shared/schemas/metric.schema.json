@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visionlayer.local/schemas/metric.schema.json",
+  "title": "Metric",
+  "description": "Time-stamped metric produced by skills or analytics (counts, rates, dwell averages).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "name",
+    "value",
+    "timestamp",
+    "unit"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "value": {
+      "type": "number"
+    },
+    "unit": {
+      "type": "string",
+      "enum": ["count", "seconds", "ratio", "percent", "custom"]
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Unix timestamp in seconds."
+    },
+    "camera_id": {
+      "type": ["string", "null"]
+    },
+    "zone_id": {
+      "type": ["string", "null"]
+    },
+    "skill_id": {
+      "type": ["string", "null"]
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

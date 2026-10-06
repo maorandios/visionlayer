@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visionlayer.local/schemas/counter_state.schema.json",
+  "title": "CounterState",
+  "description": "Mutable counter state for line/zone counting skills and rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "counter_id",
+    "value",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "counter_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": ["string", "null"]
+    },
+    "value": {
+      "type": "integer"
+    },
+    "camera_id": {
+      "type": ["string", "null"]
+    },
+    "zone_id": {
+      "type": ["string", "null"]
+    },
+    "line_id": {
+      "type": ["string", "null"]
+    },
+    "object_class": {
+      "type": ["string", "null"]
+    },
+    "direction": {
+      "type": ["string", "null"],
+      "enum": ["any", "a_to_b", "b_to_a", null]
+    },
+    "window_started_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "skill_id": {
+      "type": ["string", "null"]
+    }
+  }
+}

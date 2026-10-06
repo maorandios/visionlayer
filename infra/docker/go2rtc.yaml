@@ -1,0 +1,13 @@
+# go2rtc placeholder config — no real cameras in Phase 0.
+# Streams will be registered dynamically from Edge API in Phase 8.
+
+api:
+  listen: ":1984"
+
+rtsp:
+  listen: ":8554"
+
+webrtc:
+  listen: ":8555"
+
+streams: {}

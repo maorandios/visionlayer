@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visionlayer.local/schemas/vision_capabilities.schema.json",
+  "title": "VisionCapabilities",
+  "description": "Capabilities advertised by a VisionAdapter so Product Layer and Skills can gate features.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "adapter",
+    "capabilities",
+    "supported_classes"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "adapter": {
+      "type": "string",
+      "enum": ["mock", "dev", "deepstream", "hailo"]
+    },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "detection",
+          "tracking",
+          "multi_camera",
+          "gpu",
+          "npu",
+          "hardware_decode"
+        ]
+      }
+    },
+    "supported_classes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "max_cameras": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "notes": {
+      "type": ["string", "null"]
+    }
+  }
+}

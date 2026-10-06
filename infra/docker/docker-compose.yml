@@ -1,0 +1,50 @@
+services:
+  edge-api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: visionlayer-edge-api
+    ports:
+      - "8000:8000"
+    environment:
+      VL_ENV: development
+      VL_LOG_LEVEL: INFO
+      DATABASE_URL: sqlite+aiosqlite:///./data/visionlayer.db
+      FEATURE_SIMULATE_DETECTIONS: "true"
+    volumes:
+      - edge-api-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+    container_name: visionlayer-web
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      edge-api:
+        condition: service_healthy
+
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: visionlayer-go2rtc
+    volumes:
+      - ./go2rtc.yaml:/config/go2rtc.yaml:ro
+    ports:
+      - "1984:1984"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    profiles:
+      - media
+    # Placeholder only in Phase 0 — enable with: docker compose --profile media up
+
+volumes:
+  edge-api-data:

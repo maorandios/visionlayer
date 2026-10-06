@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visionlayer.local/schemas/detection.schema.json",
+  "title": "DetectionEvent",
+  "description": "Unified detection contract emitted by every VisionAdapter backend.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "schema_version",
+    "camera_id",
+    "class",
+    "confidence",
+    "bbox",
+    "timestamp",
+    "source"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "detection"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "camera_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "class": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Object class label from the active model (person, car, truck, ...)."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "bbox": {
+      "type": "array",
+      "description": "Pixel bounding box [x1, y1, x2, y2].",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number" }
+    },
+    "track_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Unix timestamp in seconds (fractional allowed)."
+    },
+    "frame_size": {
+      "type": "array",
+      "description": "Frame size [width, height] in pixels.",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "integer", "minimum": 1 }
+    },
+    "source": {
+      "type": "string",
+      "enum": ["mock", "dev", "deepstream", "hailo", "development_video"]
+    }
+  }
+}

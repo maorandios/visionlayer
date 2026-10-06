@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visionlayer.local/schemas/event.schema.json",
+  "title": "Event",
+  "description": "Product event created by rules or skills from spatial/detection signals.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "schema_version",
+    "type",
+    "severity",
+    "camera_id",
+    "started_at",
+    "state"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "zone_enter",
+        "zone_exit",
+        "line_cross",
+        "loitering",
+        "dwell",
+        "count_threshold",
+        "rule_match"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warning", "critical"]
+    },
+    "camera_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rule_id": {
+      "type": ["string", "null"]
+    },
+    "skill_id": {
+      "type": ["string", "null"]
+    },
+    "object_class": {
+      "type": ["string", "null"]
+    },
+    "track_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "zone_id": {
+      "type": ["string", "null"]
+    },
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "state": {
+      "type": "string",
+      "enum": ["new", "acknowledged", "resolved"]
+    },
+    "thumbnail_url": {
+      "type": ["string", "null"]
+    },
+    "clip_url": {
+      "type": ["string", "null"]
+    },
+    "message_he": {
+      "type": ["string", "null"]
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+# VisionLayer feature flags — defaults for local Edge Hub.
+# Override with env: FEATURE_<NAME>=true|false (see edge-api config).
+
+features:
+  simulate_detections: true
+  video_lab: true
+  live_video: false
+  web_push: false
+  cloud_sync: false
+  skills: false
+  natural_language_rules: false
+  semantic_search: false
+  onvif_discovery: false

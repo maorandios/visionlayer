@@ -1,0 +1,28 @@
+[project]
+name = "visionlayer-vision"
+version = "0.2.0"
+description = "VisionLayer Vision Adapter + Video Test Lab pipeline"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26.0",
+  "opencv-python-headless>=4.10.0",
+  "onnxruntime>=1.19.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["adapters", "sources", "detectors", "trackers", "pipeline"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"lab_api.py" = "lab_api.py"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

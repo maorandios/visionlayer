@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visionlayer.local/schemas/rule.schema.json",
+  "title": "Rule",
+  "description": "Validated product rule definition. Extensible for schedules, durations, counts, and actions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "enabled", "conditions", "actions"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "skill_id": {
+      "type": ["string", "null"]
+    },
+    "cooldown_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "object_classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "camera_id": {
+          "type": ["string", "null"]
+        },
+        "zone_id": {
+          "type": ["string", "null"]
+        },
+        "line_id": {
+          "type": ["string", "null"]
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["any", "a_to_b", "b_to_a"]
+        },
+        "schedule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": {
+              "type": "string",
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              }
+            },
+            "timezone": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "min_duration_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "threshold": {
+          "type": "number"
+        },
+        "aggregation_window_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["push_notification", "create_event"]
+          }
+        }
+      }
+    }
+  }
+}

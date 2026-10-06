@@ -1,0 +1,132 @@
+{
+  "recommendation": {
+    "preferred_model": "yolox_s",
+    "frame_stride": 2,
+    "onnx_intra_op_num_threads": 4,
+    "onnx_inter_op_num_threads": 1,
+    "opencv_num_threads": 2,
+    "rationale": "Default development config favors yolox_s + stride=2 + limited ORT/OpenCV threads so the host PC stays responsive while detection quality remains usable."
+  },
+  "results": [
+    {
+      "label": "scripted stride=1",
+      "total_analysis_sec": 0.025,
+      "detector_calls": 60,
+      "frames_read": 60,
+      "processing_fps": 2431.68,
+      "unique_tracks": 1,
+      "detections": 60,
+      "frame_stride": 1,
+      "detector_name": "scripted_test_detector",
+      "model_path": null,
+      "runtime_config": {
+        "onnx_intra_op_num_threads": 4,
+        "onnx_inter_op_num_threads": 1,
+        "opencv_num_threads": 2,
+        "frame_stride": 2,
+        "preferred_model": "yolox_s"
+      },
+      "gallery_cards": 1
+    },
+    {
+      "label": "scripted stride=2",
+      "total_analysis_sec": 0.02,
+      "detector_calls": 30,
+      "frames_read": 60,
+      "processing_fps": 1509.21,
+      "unique_tracks": 1,
+      "detections": 30,
+      "frame_stride": 2,
+      "detector_name": "scripted_test_detector",
+      "model_path": null,
+      "runtime_config": {
+        "onnx_intra_op_num_threads": 4,
+        "onnx_inter_op_num_threads": 1,
+        "opencv_num_threads": 2,
+        "frame_stride": 2,
+        "preferred_model": "yolox_s"
+      },
+      "gallery_cards": 1
+    },
+    {
+      "label": "scripted stride=3",
+      "total_analysis_sec": 0.02,
+      "detector_calls": 20,
+      "frames_read": 60,
+      "processing_fps": 1017.79,
+      "unique_tracks": 1,
+      "detections": 20,
+      "frame_stride": 3,
+      "detector_name": "scripted_test_detector",
+      "model_path": null,
+      "runtime_config": {
+        "onnx_intra_op_num_threads": 4,
+        "onnx_inter_op_num_threads": 1,
+        "opencv_num_threads": 2,
+        "frame_stride": 2,
+        "preferred_model": "yolox_s"
+      },
+      "gallery_cards": 1
+    },
+    {
+      "label": "yolox_m stride=1",
+      "total_analysis_sec": 100.949,
+      "detector_calls": 40,
+      "frames_read": 40,
+      "processing_fps": 0.4,
+      "unique_tracks": 0,
+      "detections": 0,
+      "frame_stride": 1,
+      "detector_name": "yolox_onnx",
+      "model_path": "C:\\VISIONLAYER\\data\\models\\yolox_m.onnx",
+      "runtime_config": {
+        "onnx_intra_op_num_threads": 4,
+        "onnx_inter_op_num_threads": 1,
+        "opencv_num_threads": 2,
+        "frame_stride": 2,
+        "preferred_model": "yolox_s"
+      },
+      "gallery_cards": 0
+    },
+    {
+      "label": "yolox_s stride=2",
+      "total_analysis_sec": 1.679,
+      "detector_calls": 20,
+      "frames_read": 40,
+      "processing_fps": 11.91,
+      "unique_tracks": 0,
+      "detections": 0,
+      "frame_stride": 2,
+      "detector_name": "yolox_onnx",
+      "model_path": "C:\\VISIONLAYER\\data\\models\\yolox_s.onnx",
+      "runtime_config": {
+        "onnx_intra_op_num_threads": 4,
+        "onnx_inter_op_num_threads": 1,
+        "opencv_num_threads": 2,
+        "frame_stride": 2,
+        "preferred_model": "yolox_s"
+      },
+      "gallery_cards": 0
+    },
+    {
+      "label": "yolox_s stride=3",
+      "total_analysis_sec": 1.183,
+      "detector_calls": 14,
+      "frames_read": 40,
+      "processing_fps": 11.84,
+      "unique_tracks": 0,
+      "detections": 0,
+      "frame_stride": 3,
+      "detector_name": "yolox_onnx",
+      "model_path": "C:\\VISIONLAYER\\data\\models\\yolox_s.onnx",
+      "runtime_config": {
+        "onnx_intra_op_num_threads": 4,
+        "onnx_inter_op_num_threads": 1,
+        "opencv_num_threads": 2,
+        "frame_stride": 2,
+        "preferred_model": "yolox_s"
+      },
+      "gallery_cards": 0
+    }
+  ]
+}

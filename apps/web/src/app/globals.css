@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Grayscale design tokens only — no brand accent colors in Phase 0 */
+  --color-canvas: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-muted: #e5e5e5;
+  --color-border: #d4d4d4;
+  --color-ink: #171717;
+  --color-ink-muted: #737373;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Mobile-first safe areas for future PWA shell */
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-pt {
+  padding-top: env(safe-area-inset-top, 0px);
+}

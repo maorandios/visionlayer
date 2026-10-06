@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://visionlayer.local/schemas/skill.manifest.schema.json",
+  "title": "SkillManifest",
+  "description": "Declarative skill package manifest. Skills plug into core without modifying it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name_he", "version", "requires", "outputs", "config_schema"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "minLength": 2,
+      "maxLength": 64
+    },
+    "name_he": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "description_he": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "requires": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "detection",
+          "tracking",
+          "zone_enter",
+          "zone_exit",
+          "line_crossing",
+          "direction",
+          "loitering",
+          "dwell_time",
+          "counting"
+        ]
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "config_schema": {
+      "type": "object",
+      "description": "JSON Schema fragment describing skill-specific configuration.",
+      "additionalProperties": true
+    }
+  }
+}
