@@ -1,98 +1,145 @@
 "use client";
 
-import { Activity, Camera, FileText, Shield } from "lucide-react";
+import { AlertCircle, Camera, CheckCircle2, Shield } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { EventCard } from "@/components/events/EventCard";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
-import { formatDateTime, isToday, stateHe } from "@/lib/format";
-import { api } from "@/lib/api";
-import type { Camera as CameraType, Rule } from "@/lib/types";
-import { EventThumbnail } from "@/components/events/EventThumbnail";
-import { useAuth } from "@/providers/AuthProvider";
-import { useEvents } from "@/providers/EventsProvider";
-import { useCatalog } from "@/providers/CatalogProvider";
+import { Chip } from "@/components/ui/Chip";
+import { KpiCard } from "@/components/ui/KpiCard";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
 import { t } from "@/i18n/he";
+import { api } from "@/lib/api";
+import { isToday } from "@/lib/format";
+import { formatCount, rangeFor } from "@/lib/metrics";
+import type { MetricsSummary } from "@/lib/types";
+import { useAuth } from "@/providers/AuthProvider";
+import { useCatalog } from "@/providers/CatalogProvider";
+import { useEvents } from "@/providers/EventsProvider";
 
-export default function DashboardPage() {
+export default function HomePage() {
   const { token } = useAuth();
-  const { cameraName } = useCatalog();
+  const { cameras, rules, cameraName, ruleName, loading: catalogLoading } = useCatalog();
   const { events, loading: eventsLoading, error: eventsError, refresh } = useEvents();
-  const [cameras, setCameras] = useState<CameraType[]>([]);
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<MetricsSummary | null>(null);
+  const eventCount = events.length;
 
   useEffect(() => {
-    if (!token) return;
+    // Re-fetch today's summary whenever a new event arrives (eventCount changes).
+    if (!token || eventCount < 0) return;
+    let cancelled = false;
     (async () => {
-      setLoading(true);
-      setError(null);
       try {
-        const [c, r] = await Promise.all([api.cameras.list(token), api.rules.list(token)]);
-        setCameras(c);
-        setRules(r);
-        await refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : t("errorLoad"));
-      } finally {
-        setLoading(false);
+        const s = await api.metrics.summary(token, { scope: "production", ...rangeFor("today") });
+        if (!cancelled) setSummary(s);
+      } catch {
+        if (!cancelled) setSummary(null);
       }
     })();
-  }, [token, refresh]);
+    return () => {
+      cancelled = true;
+    };
+  }, [token, eventCount]);
 
   const stats = useMemo(() => {
-    const activeCameras = cameras.filter((c) => c.enabled).length;
+    const enabledCameras = cameras.filter((c) => c.enabled).length;
+    const disabledCameras = cameras.length - enabledCameras;
     const activeRules = rules.filter((r) => r.enabled).length;
-    const eventsToday = events.filter((e) => isToday(e.created_at)).length;
-    return { totalCameras: cameras.length, activeCameras, activeRules, eventsToday };
+    const todayEvents = events.filter((e) => isToday(e.created_at) && !e.source_analysis_run_id);
+    const newEvents = events.filter((e) => e.state === "new" && !e.source_analysis_run_id).length;
+    return {
+      totalCameras: cameras.length,
+      enabledCameras,
+      disabledCameras,
+      activeRules,
+      eventsToday: todayEvents.length,
+      newEvents,
+    };
   }, [cameras, rules, events]);
 
-  if (loading || eventsLoading) return <LoadingBlock />;
-  if (error || eventsError)
-    return <ErrorBlock message={error ?? eventsError ?? t("errorLoad")} onRetry={refresh} />;
+  if (catalogLoading && cameras.length === 0) return <LoadingBlock />;
+  if (eventsLoading && events.length === 0) return <LoadingBlock />;
+  if (eventsError) return <ErrorBlock message={eventsError} onRetry={refresh} />;
+
+  const systemHealthy = stats.disabledCameras === 0;
+  const vehicles = summary?.vehicles?.unique_objects ?? 0;
+  const persons = summary?.persons?.unique_objects ?? 0;
+  const attention: { text: string; href: string }[] = [];
+  if (stats.newEvents > 0) {
+    attention.push({ text: `${stats.newEvents} ${t("newEventsCount")}`, href: "/events?state=new" });
+  }
+  if (stats.disabledCameras > 0) {
+    attention.push({
+      text:
+        stats.disabledCameras === 1
+          ? "מצלמה אחת מושבתת"
+          : `${stats.disabledCameras} ${t("disabledCamerasCount")}`,
+      href: "/cameras",
+    });
+  }
+  if (rules.length === 0 && cameras.length > 0) {
+    attention.push({ text: t("noRulesYetHint"), href: "/rules/new" });
+  }
+
+  const recent = events.filter((e) => !e.source_analysis_run_id).slice(0, 5);
 
   return (
     <div className="space-y-6">
-      <header>
+      <header className="space-y-3">
         <h1 className="text-2xl font-semibold text-ink">{t("dashboardTitle")}</h1>
+        <Card className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="home-status">
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-ink">
+            {systemHealthy ? (
+              <CheckCircle2 className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            ) : (
+              <AlertCircle className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+            )}
+            {systemHealthy ? t("homeSystemActive") : t("homeSystemPartial")}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
+            <Camera className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+            {stats.enabledCameras}/{stats.totalCameras} {t("camerasTotal")}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
+            <Shield className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+            {stats.activeRules} {t("rulesActive")}
+          </span>
+        </Card>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard icon={Activity} label={t("systemStatus")} value={t("systemOk")} />
-        <StatCard icon={Camera} label={t("camerasActive")} value={`${stats.activeCameras}/${stats.totalCameras}`} />
-        <StatCard icon={Shield} label={t("rulesActive")} value={String(stats.activeRules)} />
-        <StatCard icon={FileText} label={t("eventsToday")} value={String(stats.eventsToday)} />
-      </div>
-
       <section>
-        <h2 className="mb-3 text-sm font-medium text-ink">{t("recentEvents")}</h2>
-        {events.length === 0 ? (
-          <p className="text-sm text-ink-muted">{t("emptyEvents")}</p>
+        <SectionHeader
+          title={t("todaySummary")}
+          action={
+            <Link href="/insights" className="text-xs text-ink-muted hover:text-ink">
+              {t("navInsights")} ›
+            </Link>
+          }
+        />
+        <div className="grid grid-cols-3 gap-3" data-testid="home-today">
+          <KpiCard label={t("vehiclesToday")} value={formatCount(vehicles)} />
+          <KpiCard label={t("peopleToday")} value={formatCount(persons)} />
+          <KpiCard label={t("eventsToday")} value={formatCount(stats.eventsToday)} />
+        </div>
+      </section>
+
+      <section data-testid="home-attention">
+        <SectionHeader title={t("needsAttention")} />
+        {attention.length === 0 ? (
+          <Card className="flex items-center gap-2 text-sm text-ink-muted">
+            <CheckCircle2 className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+            {t("allGood")}
+          </Card>
         ) : (
           <ul className="space-y-2">
-            {events.slice(0, 5).map((ev) => (
-              <li key={ev.id}>
-                <Link href={`/events/${ev.id}`}>
-                  <Card className="transition hover:bg-muted/40">
-                    <div className="flex gap-3">
-                      <EventThumbnail
-                        token={token}
-                        eventId={ev.id}
-                        hasSnapshot={Boolean(ev.has_snapshot)}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="line-clamp-2 text-sm font-medium text-ink">{ev.message_he}</p>
-                          <span className="shrink-0 rounded-lg bg-muted px-2 py-0.5 text-[11px] text-ink">
-                            {stateHe(ev.state)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-ink-muted">
-                          {cameraName(ev.camera_id)} · {formatDateTime(ev.started_at)}
-                        </p>
-                      </div>
-                    </div>
+            {attention.map((item) => (
+              <li key={item.href + item.text}>
+                <Link href={item.href} className="block">
+                  <Card className="flex min-h-12 items-center justify-between gap-3 py-2.5 transition hover:bg-muted/40">
+                    <span className="text-sm text-ink">{item.text}</span>
+                    <Chip tone="outline">{t("viewAll")}</Chip>
                   </Card>
                 </Link>
               </li>
@@ -100,28 +147,44 @@ export default function DashboardPage() {
           </ul>
         )}
       </section>
-    </div>
-  );
-}
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Activity;
-  label: string;
-  value: string;
-}) {
-  return (
-    <Card>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-xs text-ink-muted">{label}</p>
-          <p className="mt-1 text-lg font-semibold text-ink">{value}</p>
-        </div>
-        <Icon className="h-5 w-5 text-ink-muted" strokeWidth={1.75} aria-hidden />
-      </div>
-    </Card>
+      <section>
+        <SectionHeader
+          title={t("recentEvents")}
+          action={
+            <Link href="/events" className="text-xs text-ink-muted hover:text-ink">
+              {t("viewAll")} ›
+            </Link>
+          }
+        />
+        {recent.length === 0 ? (
+          <EmptyBlock
+            message={t("emptyEvents")}
+            action={
+              rules.length === 0 ? (
+                <Link href="/rules/new">
+                  <Button variant="secondary">{t("addRule")}</Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <ul className="space-y-2">
+            {recent.map((ev) => (
+              <li key={ev.id}>
+                <EventCard
+                  event={ev}
+                  token={token}
+                  href={`/events/${ev.id}`}
+                  cameraName={cameraName(ev.camera_id)}
+                  ruleName={ruleName(ev.rule_id)}
+                  variant="compact"
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }

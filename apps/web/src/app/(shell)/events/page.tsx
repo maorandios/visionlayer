@@ -1,84 +1,98 @@
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { ArrowRight } from "lucide-react";
-import { formatDateTime, objectClassHe, severityHe, stateHe } from "@/lib/format";
-import { Card } from "@/components/ui/Card";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo } from "react";
+import { EventCard } from "@/components/events/EventCard";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
-import { EventThumbnail } from "@/components/events/EventThumbnail";
+import { Tabs } from "@/components/ui/Tabs";
+import { t } from "@/i18n/he";
 import { useAuth } from "@/providers/AuthProvider";
 import { useCatalog } from "@/providers/CatalogProvider";
 import { useEvents } from "@/providers/EventsProvider";
-import { t } from "@/i18n/he";
+
+type StateFilter = "all" | "new" | "acknowledged";
 
 function EventsInner() {
   const { token } = useAuth();
+  const router = useRouter();
   const { events, loading, error, refresh } = useEvents();
-  const { cameraName, zoneName, ruleName } = useCatalog();
+  const { cameraName, ruleName } = useCatalog();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
-  const labReturn =
-    returnTo && returnTo.startsWith("/dev/video-lab") ? returnTo : null;
+  const labReturn = returnTo && returnTo.startsWith("/dev/video-lab") ? returnTo : null;
+  const stateParam = searchParams.get("state");
+  const stateFilter: StateFilter = stateParam === "new" || stateParam === "acknowledged" ? stateParam : "all";
 
-  if (loading) return <LoadingBlock />;
+  const setStateFilter = (next: StateFilter) => {
+    const q = new URLSearchParams(searchParams.toString());
+    if (next === "all") q.delete("state");
+    else q.set("state", next);
+    const s = q.toString();
+    router.replace(s ? `/events?${s}` : "/events", { scroll: false });
+  };
+
+  const counts = useMemo(
+    () => ({
+      all: events.length,
+      new: events.filter((e) => e.state === "new").length,
+      acknowledged: events.filter((e) => e.state !== "new").length,
+    }),
+    [events],
+  );
+
+  const visible = useMemo(
+    () =>
+      events.filter((e) => {
+        if (stateFilter === "new") return e.state === "new";
+        if (stateFilter === "acknowledged") return e.state !== "new";
+        return true;
+      }),
+    [events, stateFilter],
+  );
+
+  if (loading && events.length === 0) return <LoadingBlock />;
   if (error) return <ErrorBlock message={error} onRetry={refresh} />;
 
   return (
     <div className="space-y-4">
-      {labReturn ? (
-        <Link
-          href={labReturn}
-          className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink"
-        >
-          <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-          {labReturn.includes("run=") ? t("backToVideoLabRun") : t("backToVideoLab")}
-        </Link>
+      <PageHeader
+        title={t("eventsTitle")}
+        subtitle={t("eventsSubtitle")}
+        backHref={labReturn ?? undefined}
+        backLabel={labReturn ? (labReturn.includes("run=") ? t("backToVideoLabRun") : t("backToVideoLab")) : undefined}
+      />
+      {events.length > 0 ? (
+        <Tabs
+          size="sm"
+          ariaLabel={t("state")}
+          value={stateFilter}
+          onChange={setStateFilter}
+          items={[
+            { id: "all", label: t("filterAll"), count: counts.all },
+            { id: "new", label: t("filterNew"), count: counts.new },
+            { id: "acknowledged", label: t("filterAcknowledged"), count: counts.acknowledged },
+          ]}
+        />
       ) : null}
-      <h1 className="text-2xl font-semibold text-ink">{t("eventsTitle")}</h1>
-      {events.length === 0 ? (
+      {visible.length === 0 ? (
         <EmptyBlock message={t("emptyEvents")} />
       ) : (
         <ul className="space-y-3">
-          {events.map((ev) => {
+          {visible.map((ev) => {
             const href = labReturn
               ? `/events/${ev.id}?returnTo=${encodeURIComponent(labReturn)}`
               : `/events/${ev.id}`;
             return (
               <li key={ev.id}>
-                <Link href={href}>
-                  <Card className="transition hover:bg-muted/40">
-                    <div className="flex gap-3">
-                      <EventThumbnail
-                        token={token}
-                        eventId={ev.id}
-                        hasSnapshot={Boolean(ev.has_snapshot)}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium text-ink">{ev.message_he}</p>
-                          <span className="shrink-0 rounded-lg bg-muted px-2 py-0.5 text-[11px] text-ink">
-                            {stateHe(ev.state)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-ink-muted">
-                          {cameraName(ev.camera_id)} · {formatDateTime(ev.started_at)}
-                        </p>
-                        {ev.rule_id ? (
-                          <p className="mt-0.5 text-xs text-ink-muted">
-                            {t("matchedRule")}: {ruleName(ev.rule_id)}
-                          </p>
-                        ) : null}
-                        <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-ink-muted">
-                          <span>{zoneName(ev.zone_id)}</span>
-                          <span>{objectClassHe(ev.object_class)}</span>
-                          <span>{severityHe(ev.severity)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
+                {/* EventCard renders EventThumbnail from ev.has_snapshot */}
+                <EventCard
+                  event={ev}
+                  token={token}
+                  href={href}
+                  cameraName={cameraName(ev.camera_id)}
+                  ruleName={ruleName(ev.rule_id)}
+                />
               </li>
             );
           })}

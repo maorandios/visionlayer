@@ -110,6 +110,70 @@ export type EventItem = {
   has_clip?: boolean;
 };
 
+// ---- Metrics (mirrors services/edge-api/app/api/metrics_schemas.py) ----
+
+export type MetricScope = "production" | "video_lab";
+export type MetricType =
+  | "zone_entries"
+  | "zone_exits"
+  | "line_crossings"
+  | "unique_objects"
+  | "dwell"
+  | "occupancy_peak";
+export type MetricBucket = "hour" | "day";
+export type MetricBreakdownBy = "camera" | "zone" | "line" | "object_class" | "direction";
+
+export type MetricFilters = {
+  scope?: MetricScope;
+  analysis_run_id?: string | null;
+  from?: string;
+  to?: string;
+  camera_id?: string;
+  zone_id?: string;
+  line_id?: string;
+  object_class?: string;
+  direction?: string;
+};
+
+export type MetricsSummary = {
+  scope: MetricScope;
+  analysis_run_id: string | null;
+  from: string | null;
+  to: string | null;
+  totals: {
+    zone_entries: number;
+    zone_exits: number;
+    line_crossings: number;
+    unique_objects: number;
+    events_total: number;
+  };
+  dwell: { sessions: number; total_seconds: number; avg_seconds: number; max_seconds: number };
+  occupancy: {
+    camera_id: string;
+    zone_id: string;
+    current: number;
+    peak: number;
+    peak_at: string | null;
+    updated_at: string | null;
+  }[];
+  peak_occupancy: number;
+  by_class: { object_class: string; unique_objects: number; zone_entries: number; line_crossings: number }[];
+  vehicles: { unique_objects: number; zone_entries: number; line_crossings: number };
+  persons: { unique_objects: number; zone_entries: number; line_crossings: number };
+};
+
+export type MetricsTimeseries = {
+  metric_type: MetricType;
+  bucket: MetricBucket;
+  points: { bucket_start: string; value: number; count: number }[];
+};
+
+export type MetricsBreakdown = {
+  metric_type: MetricType;
+  by: MetricBreakdownBy;
+  items: { key: string; value: number; count: number }[];
+};
+
 export type WsMessage =
   | { type: "event.created"; event: EventItem }
   | { type: string; event?: EventItem };

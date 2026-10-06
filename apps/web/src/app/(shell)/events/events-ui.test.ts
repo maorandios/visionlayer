@@ -10,14 +10,33 @@ describe("event media UI", () => {
     expect(detail).toContain("eventMediaUnavailable");
   });
 
-  it("events feed uses thumbnail component", () => {
+  it("events feed uses the media-first EventCard (which renders EventThumbnail)", () => {
     const feed = readFileSync(resolve(__dirname, "page.tsx"), "utf8");
-    expect(feed).toContain("EventThumbnail");
-    expect(feed).toContain("has_snapshot");
+    const card = readFileSync(resolve(__dirname, "../../../components/events/EventCard.tsx"), "utf8");
+    expect(feed).toContain("EventCard");
+    expect(card).toContain("EventThumbnail");
+    expect(card).toContain("has_snapshot");
   });
 
-  it("dashboard recent events use thumbnails", () => {
+  it("dashboard recent events use media-first cards", () => {
     const dash = readFileSync(resolve(__dirname, "../page.tsx"), "utf8");
-    expect(dash).toContain("EventThumbnail");
+    expect(dash).toContain("EventCard");
+  });
+
+  it("event detail is media-first with collapsed technical details", () => {
+    const detail = readFileSync(resolve(__dirname, "[id]/page.tsx"), "utf8");
+    // hero image comes before the info card
+    expect(detail.indexOf("snapshotLargeUrl ?")).toBeLessThan(detail.indexOf('t("eventWhere")'));
+    expect(detail).toContain("<details");
+    expect(detail).toContain("technicalDetails");
+    expect(detail).toContain("devSourceBadge");
+    expect(detail).toContain('t("acknowledge")');
+  });
+
+  it("events list offers state filters without technical jargon", () => {
+    const feed = readFileSync(resolve(__dirname, "page.tsx"), "utf8");
+    expect(feed).toContain("filterNew");
+    expect(feed).toContain("filterAcknowledged");
+    expect(feed).not.toContain("track_id");
   });
 });

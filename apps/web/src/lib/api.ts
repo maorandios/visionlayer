@@ -3,6 +3,13 @@ import type {
   EventItem,
   HubInfo,
   Line,
+  MetricBreakdownBy,
+  MetricBucket,
+  MetricFilters,
+  MetricType,
+  MetricsBreakdown,
+  MetricsSummary,
+  MetricsTimeseries,
   Rule,
   User,
   Zone,
@@ -54,6 +61,15 @@ async function request<T>(
     return undefined as T;
   }
   return res.json() as Promise<T>;
+}
+
+function metricQuery(filters: MetricFilters, extra: Record<string, string> = {}): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries({ ...filters, ...extra })) {
+    if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
 }
 
 export const api = {
@@ -242,6 +258,26 @@ export const api = {
       // Browsers need an explicit video MIME for <video> blob URLs
       if (blob.type && blob.type.startsWith("video/")) return blob;
       return new Blob([blob], { type: "video/mp4" });
+    },
+  },
+
+  metrics: {
+    summary(token: string, filters: MetricFilters = {}) {
+      return request<MetricsSummary>(`/api/v1/metrics/summary${metricQuery(filters)}`, {}, token);
+    },
+    timeseries(token: string, metricType: MetricType, bucket: MetricBucket, filters: MetricFilters = {}) {
+      return request<MetricsTimeseries>(
+        `/api/v1/metrics/timeseries${metricQuery(filters, { metric_type: metricType, bucket })}`,
+        {},
+        token,
+      );
+    },
+    breakdown(token: string, metricType: MetricType, by: MetricBreakdownBy, filters: MetricFilters = {}) {
+      return request<MetricsBreakdown>(
+        `/api/v1/metrics/breakdown${metricQuery(filters, { metric_type: metricType, by })}`,
+        {},
+        token,
+      );
     },
   },
 

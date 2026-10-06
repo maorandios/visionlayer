@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
 import { formatDateTime, objectClassHe, severityHe, stateHe } from "@/lib/format";
 import { api } from "@/lib/api";
@@ -127,107 +128,120 @@ function EventDetailInner() {
       ? event.payload.rule_name
       : ruleName(event.rule_id);
 
-  return (
-    <div className="mx-auto max-w-lg space-y-4">
-      {backHref ? (
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink"
-        >
-          <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-          {backHref.includes("run=") ? t("backToVideoLabRun") : t("backToVideoLab")}
-        </Link>
-      ) : (
-        <Link href="/events" className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
-          <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-          {t("eventsTitle")}
-        </Link>
-      )}
-      <h1 className="text-2xl font-semibold text-ink">{t("eventDetail")}</h1>
-      <Card className="space-y-4">
-        {snapshotLargeUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={snapshotLargeUrl}
-            alt=""
-            className="w-full rounded-xl border border-border object-contain"
-          />
-        ) : event.has_snapshot ? (
-          <EventThumbnail
-            token={token}
-            eventId={event.id}
-            hasSnapshot
-            className="flex h-48 w-full items-center justify-center rounded-xl border border-border bg-muted"
-          />
-        ) : (
-          <p className="rounded-xl border border-dashed border-border bg-muted/40 px-3 py-8 text-center text-sm text-ink-muted">
-            {t("eventMediaUnavailable")}
-          </p>
-        )}
+  const isDevSource = Boolean(event.source_analysis_run_id);
+  const isNew = event.state === "new";
+  const when = `${formatDateTime(event.started_at)}${
+    event.trigger_timestamp_sec != null
+      ? ` · ${t("videoTimestamp")} ${event.trigger_timestamp_sec.toFixed(1)} ${t("secondsUnit")}`
+      : ""
+  }`;
+  const where = [cameraName(event.camera_id), zoneName(event.zone_id)].filter((x) => x && x !== "—").join(" · ");
 
-        <p className="text-base font-medium text-ink">{event.message_he}</p>
-        <Row label="זמן" value={formatDateTime(event.started_at)} />
-        <Row label="מצלמה" value={cameraName(event.camera_id)} />
-        <Row label="אזור" value={zoneName(event.zone_id)} />
-        <Row label={t("matchedRule")} value={ruleLabel} />
-        <Row label="אובייקט" value={objectClassHe(event.object_class)} />
-        {typeof duration === "number" ? (
-          <Row label={t("duration")} value={`${duration} ${t("seconds")}`} />
-        ) : null}
-        {event.trigger_timestamp_sec != null ? (
-          <Row
-            label={t("videoTimestamp")}
-            value={`${event.trigger_timestamp_sec.toFixed(1)} ${t("secondsUnit")}`}
-          />
-        ) : null}
-        <Row label={t("severity")} value={severityHe(event.severity)} />
-        <Row label={t("state")} value={stateHe(event.state)} />
-        {event.state === "new" ? (
-          <Button className="w-full" onClick={onAck}>
-            {t("acknowledge")}
-          </Button>
-        ) : null}
-        {event.has_clip ? (
-          <Button variant="secondary" className="w-full" onClick={() => setShowClip((v) => !v)}>
-            {showClip ? t("hideEventClip") : t("showEventClip")}
-          </Button>
-        ) : null}
-        {showClip && clipUrl ? (
-          <video
-            key={clipUrl}
-            src={clipUrl}
-            controls
-            autoPlay
-            playsInline
-            preload="metadata"
-            className="w-full rounded-xl border border-border bg-black"
-          >
-            <source src={clipUrl} type="video/mp4" />
-          </video>
-        ) : null}
-        {showClip && clipError ? (
-          <p className="text-sm text-ink-muted">{clipError}</p>
-        ) : null}
-        {backHref?.includes("run=") ? (
-          <Link href={backHref}>
-            <Button variant="secondary" className="w-full">
-              {t("backToVideoLabRun")}
-            </Button>
-          </Link>
-        ) : null}
-        <button
-          type="button"
-          className="text-xs text-ink-muted underline"
-          onClick={() => setShowTech((v) => !v)}
+  return (
+    <div className="mx-auto max-w-lg space-y-4 pb-20 md:pb-0">
+      <PageHeader
+        title={t("eventDetail")}
+        backHref={backHref ?? "/events"}
+        backLabel={
+          backHref ? (backHref.includes("run=") ? t("backToVideoLabRun") : t("backToVideoLab")) : t("eventsTitle")
+        }
+        badge={
+          <>
+            <Chip tone={isNew ? "solid" : "neutral"}>{stateHe(event.state)}</Chip>
+            {isDevSource ? <Chip tone="dashed">{t("devSourceBadge")}</Chip> : null}
+          </>
+        }
+      />
+
+      {/* Hero media */}
+      {snapshotLargeUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={snapshotLargeUrl}
+          alt=""
+          className="w-full rounded-2xl border border-border bg-muted object-contain"
+        />
+      ) : event.has_snapshot ? (
+        <EventThumbnail
+          token={token}
+          eventId={event.id}
+          hasSnapshot
+          className="flex h-56 w-full items-center justify-center rounded-2xl border border-border bg-muted"
+        />
+      ) : (
+        <p className="rounded-2xl border border-dashed border-border bg-muted/40 px-3 py-10 text-center text-sm text-ink-muted">
+          {t("eventMediaUnavailable")}
+        </p>
+      )}
+
+      {showClip && clipUrl ? (
+        <video
+          key={clipUrl}
+          src={clipUrl}
+          controls
+          autoPlay
+          playsInline
+          preload="metadata"
+          className="w-full rounded-2xl border border-border bg-black"
         >
-          {t("technicalDetails")}
-        </button>
-        {showTech ? (
-          <pre className="overflow-x-auto rounded-xl bg-muted p-3 text-xs text-ink-muted" dir="ltr">
-            {JSON.stringify(event.payload, null, 2)}
-          </pre>
-        ) : null}
+          <source src={clipUrl} type="video/mp4" />
+        </video>
+      ) : null}
+      {showClip && clipError ? <p className="text-sm text-ink-muted">{clipError}</p> : null}
+
+      <Card className="space-y-3">
+        <p className="text-base font-medium text-ink">{event.message_he ?? objectClassHe(event.object_class)}</p>
+        <dl className="space-y-2 text-sm">
+          <Row label={t("eventWhere")} value={where || "—"} />
+          <Row label={t("eventWhen")} value={when} />
+          <Row label={t("eventWhy")} value={ruleLabel} />
+          <Row label={t("eventObject")} value={objectClassHe(event.object_class)} />
+          {typeof duration === "number" ? <Row label={t("duration")} value={`${duration} ${t("seconds")}`} /> : null}
+          <Row label={t("severity")} value={severityHe(event.severity)} />
+        </dl>
       </Card>
+
+      {/* Primary actions — sticky on mobile so "אישור אירוע" is always reachable */}
+      <div className="fixed inset-x-0 bottom-14 z-30 border-t border-border bg-surface/95 p-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
+        <div className="mx-auto flex max-w-lg gap-2">
+          {isNew ? (
+            <Button className="flex-1" onClick={onAck}>
+              {t("acknowledge")}
+            </Button>
+          ) : null}
+          {event.has_clip ? (
+            <Button variant="secondary" className="flex-1" onClick={() => setShowClip((v) => !v)}>
+              {showClip ? t("hideEventClip") : t("showEventClip")}
+            </Button>
+          ) : null}
+          {!isNew && !event.has_clip && backHref?.includes("run=") ? (
+            <Link href={backHref} className="flex-1">
+              <Button variant="secondary" className="w-full">
+                {t("backToVideoLabRun")}
+              </Button>
+            </Link>
+          ) : null}
+        </div>
+      </div>
+
+      <details
+        className="rounded-2xl border border-border bg-surface px-4 py-3"
+        open={showTech}
+        onToggle={(e) => setShowTech((e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="cursor-pointer text-xs text-ink-muted">{t("technicalDetails")}</summary>
+        <dl className="mt-3 space-y-2 text-xs">
+          <Row label="event_id" value={event.id} mono />
+          <Row label="camera_id" value={event.camera_id} mono />
+          {event.rule_id ? <Row label="rule_id" value={event.rule_id} mono /> : null}
+          {event.track_id != null ? <Row label="track_id" value={String(event.track_id)} mono /> : null}
+          {event.confidence != null ? <Row label={t("confidence")} value={event.confidence.toFixed(2)} mono /> : null}
+          {event.source_analysis_run_id ? <Row label="analysis_run_id" value={event.source_analysis_run_id} mono /> : null}
+        </dl>
+        <pre className="mt-3 overflow-x-auto rounded-xl bg-muted p-3 text-xs text-ink-muted" dir="ltr">
+          {JSON.stringify(event.payload, null, 2)}
+        </pre>
+      </details>
     </div>
   );
 }
@@ -240,11 +254,13 @@ export default function EventDetailPage() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex justify-between gap-4 text-sm">
-      <span className="text-ink-muted">{label}</span>
-      <span className="text-end text-ink">{value}</span>
+    <div className="flex justify-between gap-4">
+      <dt className="shrink-0 text-ink-muted">{label}</dt>
+      <dd className={`min-w-0 break-all text-end text-ink ${mono ? "font-mono" : ""}`} dir={mono ? "ltr" : undefined}>
+        {value}
+      </dd>
     </div>
   );
 }

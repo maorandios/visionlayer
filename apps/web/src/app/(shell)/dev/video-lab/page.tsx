@@ -6,7 +6,9 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { ChevronDown, Film, Pause, Play, RotateCcw, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import { Input } from "@/components/ui/Input";
+import { RunMetrics } from "@/components/video-lab/RunMetrics";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
 import { api } from "@/lib/api";
 import { objectClassHe } from "@/lib/format";
@@ -506,8 +508,13 @@ function VideoLabInner() {
     if (selectedId) syncUrl(selectedId, null);
   }
 
-  const trackGallery =
-    benchmark?.track_gallery ?? job?.summary.track_gallery ?? job?.benchmark?.track_gallery ?? [];
+  const benchmarkGallery = benchmark?.track_gallery;
+  const jobSummaryGallery = job?.summary.track_gallery;
+  const jobBenchmarkGallery = job?.benchmark?.track_gallery;
+  const trackGallery = useMemo(
+    () => benchmarkGallery ?? jobSummaryGallery ?? jobBenchmarkGallery ?? [],
+    [benchmarkGallery, jobSummaryGallery, jobBenchmarkGallery],
+  );
   const uniqueByClass =
     benchmark?.metrics.unique_tracks_by_class ?? job?.summary.unique_tracks_by_class ?? {};
   const detectionsByClass =
@@ -562,7 +569,10 @@ function VideoLabInner() {
           <Film className="h-5 w-5 text-ink-muted" strokeWidth={1.75} aria-hidden />
         </span>
         <div>
-          <h1 className="text-xl font-semibold text-ink">{t("videoLabTitle")}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold text-ink">{t("videoLabTitle")}</h1>
+            <Chip tone="dashed">{t("devToolBadge")}</Chip>
+          </div>
           <p className="text-xs text-ink-muted">{t("videoLabHint")}</p>
         </div>
       </header>
@@ -891,6 +901,13 @@ function VideoLabInner() {
               </p>
             </div>
           </div>
+
+          <RunMetrics
+            runId={benchmark.id}
+            cameraId={benchmark.camera_id}
+            lineName={(id) => cameraLines.find((l) => l.id === id)?.name ?? id ?? "—"}
+            zoneName={(id) => cameraZones.find((z) => z.id === id)?.name ?? id ?? "—"}
+          />
 
           <div>
             <h3 className="mb-2 text-sm font-medium text-ink">{t("byObjectClass")}</h3>
