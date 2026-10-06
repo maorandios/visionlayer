@@ -117,7 +117,7 @@ def test_direction_matches() -> None:
 def test_dwell_fires_once_at_threshold() -> None:
     tracker = ZonePresenceTracker()
     dwells = []
-    for t in range(0, 12):
+    for t in range(12):
         evs = tracker.update(
             camera_id="cam",
             track_id=4,
@@ -136,7 +136,7 @@ def test_dwell_resets_on_reentry() -> None:
     tracker = ZonePresenceTracker()
     dwells = 0
     # first stay 0-6 → fire at 5
-    for t in range(0, 7):
+    for t in range(7):
         evs = tracker.update(
             camera_id="cam",
             track_id=5,
@@ -249,20 +249,20 @@ def _rule(trigger: str, **cond) -> RuleSnapshot:
 
 
 def _ctx(**kwargs) -> DetectionContext:
-    base = dict(
-        camera_id="cam",
-        object_class="person",
-        track_id=1,
-        confidence=0.9,
-        timestamp=_ts(1),
-        active_zone_ids=frozenset(),
-        zone_durations={},
-        camera_enabled=True,
-        enabled_zone_ids=frozenset({"z1"}),
-        zone_names={"z1": "המחסן"},
-        line_names={"gate": "שער הכניסה"},
-        spatial_events=(),
-    )
+    base = {
+        "camera_id": "cam",
+        "object_class": "person",
+        "track_id": 1,
+        "confidence": 0.9,
+        "timestamp": _ts(1),
+        "active_zone_ids": frozenset(),
+        "zone_durations": {},
+        "camera_enabled": True,
+        "enabled_zone_ids": frozenset({"z1"}),
+        "zone_names": {"z1": "המחסן"},
+        "line_names": {"gate": "שער הכניסה"},
+        "spatial_events": (),
+    }
     base.update(kwargs)
     return DetectionContext(**base)
 

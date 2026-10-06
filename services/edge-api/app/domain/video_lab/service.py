@@ -18,8 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.models import Camera, Event, Line, Rule, VideoLabAsset, VideoLabJob, Zone
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFoundError, ValidationAppError
-from app.domain.video_lab import analysis_lock
-from app.domain.video_lab import benchmark_store
+from app.domain.video_lab import analysis_lock, benchmark_store
 from app.domain.video_lab.benchmark import false_positive_stats, model_display_name, processing_fps
 from app.domain.video_lab.diagnostics import (
     build_focus_timeline,
@@ -33,7 +32,9 @@ from app.domain.video_lab.snapshots import build_best_frame_cards, build_track_r
 
 logger = logging.getLogger(__name__)
 
-PublishFn = Callable[[list[dict[str, Any]]], Awaitable[list[str]]]
+# (detections, analysis_run_id) → created event ids. Metrics are written under the
+# `video_lab` scope keyed by analysis_run_id so re-analysis never touches production totals.
+PublishFn = Callable[[list[dict[str, Any]], str], Awaitable[list[str]]]
 ClearTrackerFn = Callable[[str], None]
 
 BUSY_HE = "ניתוח אחר כבר רץ. המתינו לסיומו לפני הפעלת ניתוח נוסף."
@@ -372,7 +373,9 @@ async def run_analysis(
         )
 
         # Batch rule evaluation — never publish one DB session per detection frame
-        event_ids = list(await publish_and_collect(result.detections))
+        # Benchmark Run id == job id (benchmark_store.create_run_from_job), so metrics written
+        # here are already linked to the run that will be persisted below.
+        event_ids = list(await publish_and_collect(result.detections, job.id))
 
         event_rows: list[Event] = []
         for eid in event_ids:

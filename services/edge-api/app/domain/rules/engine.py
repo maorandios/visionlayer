@@ -148,9 +148,7 @@ def _base_gate(rule: RuleSnapshot, ctx: DetectionContext) -> bool:
         return False
     if not is_within_schedule(ctx.timestamp, conditions.get("schedule")):
         return False
-    if not _cooldown_ok(rule, ctx.timestamp):
-        return False
-    return True
+    return _cooldown_ok(rule, ctx.timestamp)
 
 
 def _match_zone_presence(rule: RuleSnapshot, ctx: DetectionContext) -> RuleMatch | None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.models import Camera, Event, Line, Rule, Zone
 from app.domain.counters import CounterStore
+from app.domain.metrics import MetricsContext, MetricsEngine, TrackObservation
 from app.domain.rules.engine import (
     DetectionContext,
     RuleSnapshot,
@@ -44,11 +45,16 @@ class DetectionPipeline:
         tracker: ZonePresenceTracker | None = None,
         line_tracker: LineCrossingTracker | None = None,
         counters: CounterStore | None = None,
+        metrics: MetricsEngine | None = None,
+        *,
+        stale_track_gap_sec: float = 5.0,
     ) -> None:
         self._session_factory = session_factory
         self.tracker = tracker or ZonePresenceTracker()
         self.line_tracker = line_tracker or LineCrossingTracker()
         self.counters = counters or CounterStore()
+        self.metrics = metrics or MetricsEngine()
+        self.stale_track_gap_sec = stale_track_gap_sec
 
     async def handle(self, _topic: str, detection: dict[str, Any]) -> list[str]:
         return await self.handle_batch([detection], once_per_track=False)
@@ -58,12 +64,22 @@ class DetectionPipeline:
         detections: list[dict[str, Any]],
         *,
         once_per_track: bool = True,
+        metrics_scope: str = "production",
+        analysis_run_id: str | None = None,
+        finalize: bool = False,
     ) -> list[str]:
+        """Evaluate a batch of detections for one camera.
+
+        ``metrics_scope`` / ``analysis_run_id`` isolate metric writes (Video Lab passes
+        ``video_lab`` + the run id). ``finalize`` closes all open zone presences at the
+        end of the batch (end of a video) so dwell sessions and occupancy settle.
+        """
         valid = [d for d in detections if d.get("type") == "detection"]
         if not valid:
             return []
 
         camera_id = str(valid[0]["camera_id"])
+        metrics_ctx = MetricsContext(scope=metrics_scope, analysis_run_id=analysis_run_id)
         async with self._session_factory() as session:
             assert isinstance(session, AsyncSession)
             camera = await session.get(Camera, camera_id)
@@ -119,6 +135,9 @@ class DetectionPipeline:
 
             created_ids: list[str] = []
             fired: set[str] = set()
+            all_spatial: list[SpatialEvent] = []
+            observations: list[TrackObservation] = []
+            last_at: datetime | None = None
 
             for detection in valid:
                 if str(detection.get("camera_id")) != camera_id:
@@ -132,6 +151,15 @@ class DetectionPipeline:
                 if track_id is None:
                     continue
                 track_id_int = int(track_id)
+                last_at = at if last_at is None or at > last_at else last_at
+                observations.append(
+                    TrackObservation(
+                        camera_id=camera_id,
+                        track_id=track_id_int,
+                        object_class=object_class,
+                        timestamp=at,
+                    )
+                )
 
                 active_zone_ids: set[str] = set()
                 zone_durations: dict[str, float] = {}
@@ -197,6 +225,8 @@ class DetectionPipeline:
                                     occurrence_id=cross.occurrence_id,
                                 )
                             )
+
+                all_spatial.extend(spatial)
 
                 # Update unique counters for count_threshold rules when a relevant spatial event fires
                 threshold_fires: dict[str, dict[str, Any]] = {}
@@ -337,6 +367,42 @@ class DetectionPipeline:
                         rule_row.last_triggered_at = at
                     last_triggered[match.rule_id] = at
                     created_ids.append(event_id)
+
+            # Close stale / finished presences so dwell sessions + occupancy settle (metrics only)
+            if last_at is not None:
+                closed = (
+                    self.tracker.flush_camera(camera_id, now=last_at)
+                    if finalize
+                    else self.tracker.expire_stale(
+                        camera_id=camera_id, now=last_at, max_gap_sec=self.stale_track_gap_sec
+                    )
+                )
+                for tid, cls, tr in closed:
+                    all_spatial.append(
+                        SpatialEvent(
+                            kind="zone_exit",
+                            camera_id=camera_id,
+                            track_id=int(tid),
+                            object_class=cls,
+                            confidence=0.0,
+                            timestamp=tr.entered_at + timedelta(seconds=tr.duration_seconds),
+                            zone_id=tr.zone_id,
+                            duration_seconds=tr.duration_seconds,
+                            occurrence_id=tr.occurrence_id,
+                        )
+                    )
+                if finalize:
+                    self.line_tracker.clear_camera(camera_id)
+
+            try:
+                await self.metrics.ingest(
+                    session,
+                    spatial_events=all_spatial,
+                    observations=observations,
+                    ctx=metrics_ctx,
+                )
+            except Exception:  # metrics must never break event creation
+                logger.exception("metrics_ingest_failed camera=%s scope=%s", camera_id, metrics_scope)
 
             await session.commit()
             if created_ids:

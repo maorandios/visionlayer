@@ -159,3 +159,24 @@ async def test_video_lab_fixture_creates_event(
     )
     assert history.status_code == 200
     assert any(r["id"] == run_id for r in history.json())
+
+    # Metrics: Video Lab writes are isolated under scope=video_lab + run id …
+    lab_metrics = await client.get(
+        "/api/v1/metrics/summary",
+        headers=auth_headers,
+        params={"scope": "video_lab", "analysis_run_id": run_id, "camera_id": camera_id},
+    )
+    assert lab_metrics.status_code == 200, lab_metrics.text
+    lab = lab_metrics.json()
+    assert lab["totals"]["unique_objects"] >= 1
+    assert lab["totals"]["zone_entries"] >= 1
+    assert lab["totals"]["events_total"] == len(job["event_ids"])
+    # … and production totals stay untouched by analysis runs.
+    prod_metrics = await client.get(
+        "/api/v1/metrics/summary", headers=auth_headers, params={"camera_id": camera_id}
+    )
+    assert prod_metrics.status_code == 200
+    prod = prod_metrics.json()
+    assert prod["totals"]["unique_objects"] == 0
+    assert prod["totals"]["zone_entries"] == 0
+    assert prod["totals"]["events_total"] == 0

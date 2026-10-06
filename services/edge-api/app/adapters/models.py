@@ -116,6 +116,69 @@ class CounterStateRow(Base):
     )
 
 
+class MetricSample(Base):
+    """Accumulated metric value for one dimension set + time bucket.
+
+    One row per (scope, analysis_run_id, metric_type, dims..., bucket, bucket_start).
+    `sample_key` is the deterministic serialization of that tuple (unique).
+    """
+
+    __tablename__ = "metric_samples"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    sample_key: Mapped[str] = mapped_column(String(400), nullable=False, unique=True)
+    scope: Mapped[str] = mapped_column(String(32), nullable=False, default="production", index=True)
+    analysis_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    metric_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    site_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    camera_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    zone_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    line_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    object_class: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    direction: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    bucket: Mapped[str] = mapped_column(String(16), nullable=False)  # hour | day | week | month
+    bucket_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sum_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    min_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    peak_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class MetricLedger(Base):
+    """Idempotency ledger: one row per applied (source occurrence × metric)."""
+
+    __tablename__ = "metric_ledger"
+
+    source_key: Mapped[str] = mapped_column(String(400), primary_key=True)
+    scope: Mapped[str] = mapped_column(String(32), nullable=False, default="production")
+    analysis_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MetricState(Base):
+    """Live (non-bucketed) state such as current zone occupancy."""
+
+    __tablename__ = "metric_state"
+
+    state_key: Mapped[str] = mapped_column(String(400), primary_key=True)
+    scope: Mapped[str] = mapped_column(String(32), nullable=False, default="production", index=True)
+    analysis_run_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    camera_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    zone_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    value_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class Rule(Base):
     __tablename__ = "rules"
 

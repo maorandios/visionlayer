@@ -20,17 +20,19 @@ from app.api.event_broadcast import router as ws_router
 from app.api.event_serializers import event_to_payload
 from app.api.events import router as events_router
 from app.api.health import router as health_router
+from app.api.lines import router as lines_router
+from app.api.metrics import router as metrics_router
 from app.api.rules import router as rules_router
 from app.api.simulate import router as simulate_router
 from app.api.video_lab import router as video_lab_router
 from app.api.zones import router as zones_router
-from app.api.lines import router as lines_router
 from app.bus.event_bus import bus
 from app.core.bootstrap import ensure_bootstrap
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import setup_logging
 from app.domain.counters import CounterStore
+from app.domain.metrics import MetricsEngine
 from app.domain.pipeline.detection_pipeline import TOPIC_DETECTIONS, DetectionPipeline
 from app.domain.rules.tracker import ZonePresenceTracker
 from app.domain.spatial.line_tracker import LineCrossingTracker
@@ -56,16 +58,19 @@ async def lifespan(app: FastAPI):
     tracker = ZonePresenceTracker()
     line_tracker = LineCrossingTracker()
     counters = CounterStore()
+    metrics = MetricsEngine(timezone=settings.metrics_timezone)
     pipeline = DetectionPipeline(
         session_factory,
         tracker=tracker,
         line_tracker=line_tracker,
         counters=counters,
+        metrics=metrics,
     )
     app.state.detection_pipeline = pipeline
     app.state.zone_tracker = tracker
     app.state.line_tracker = line_tracker
     app.state.counters = counters
+    app.state.metrics = metrics
     app.state.last_batch_event_ids = []
 
     # Reset global bus handlers to avoid duplicate subscriptions across reloads/tests
@@ -113,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(lines_router)
     app.include_router(rules_router)
     app.include_router(events_router)
+    app.include_router(metrics_router)
     app.include_router(simulate_router)
     app.include_router(video_lab_router)
 

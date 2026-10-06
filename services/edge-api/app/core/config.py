@@ -87,6 +87,9 @@ class Settings(BaseSettings):
     feature_semantic_search: bool | None = Field(default=None, alias="FEATURE_SEMANTIC_SEARCH")
     feature_onvif_discovery: bool | None = Field(default=None, alias="FEATURE_ONVIF_DISCOVERY")
 
+    # Local timezone used for metric hour/day bucket boundaries.
+    metrics_timezone: str = Field(default="Asia/Jerusalem", alias="VL_METRICS_TIMEZONE")
+
     event_media_dir: str = Field(default="./data/event-media", alias="VL_EVENT_MEDIA_DIR")
     # Future cleanup jobs will delete files older than this many days (not enforced yet).
     event_media_retention_days: int | None = Field(

@@ -8,7 +8,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.models import VideoAnalysisRun, VideoAnalysisTrackReview, VideoLabAsset, VideoLabJob
+from app.adapters.models import (
+    VideoAnalysisRun,
+    VideoAnalysisTrackReview,
+    VideoLabAsset,
+    VideoLabJob,
+)
 from app.core.errors import NotFoundError, ValidationAppError
 from app.domain.video_lab.benchmark import (
     VALID_REVIEW_STATUSES,

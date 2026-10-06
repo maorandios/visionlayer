@@ -115,7 +115,7 @@ async def preview_frame(
 
 
 async def _publish_factory(request: Request, db: AsyncSession):
-    async def publish_and_collect(detections: list[dict[str, Any]]) -> list[str]:
+    async def publish_and_collect(detections: list[dict[str, Any]], analysis_run_id: str) -> list[str]:
         pipeline = getattr(request.app.state, "detection_pipeline", None)
         if pipeline is None:
             # Fallback: legacy bus per-detection (slow)
@@ -133,7 +133,13 @@ async def _publish_factory(request: Request, db: AsyncSession):
                     tracker.clear_camera(cam)
                 if line_tracker is not None:
                     line_tracker.clear_camera(cam)
-            ids = await pipeline.handle_batch(detections, once_per_track=True)
+            ids = await pipeline.handle_batch(
+                detections,
+                once_per_track=True,
+                metrics_scope="video_lab",
+                analysis_run_id=analysis_run_id,
+                finalize=True,
+            )
 
         if ids:
             for event_id in ids:
@@ -198,7 +204,7 @@ async def analyze_asset(
         try:
             async with session_factory() as session:
 
-                async def publish(detections: list[dict[str, Any]]) -> list[str]:
+                async def publish(detections: list[dict[str, Any]], analysis_run_id: str) -> list[str]:
                     pipeline = getattr(app.state, "detection_pipeline", None)
                     if pipeline is None:
                         ids: list[str] = []
@@ -215,7 +221,13 @@ async def analyze_asset(
                             line_tracker = getattr(app.state, "line_tracker", None)
                             if line_tracker is not None:
                                 line_tracker.clear_camera(cam)
-                        ids = await pipeline.handle_batch(detections, once_per_track=True)
+                        ids = await pipeline.handle_batch(
+                            detections,
+                            once_per_track=True,
+                            metrics_scope="video_lab",
+                            analysis_run_id=analysis_run_id,
+                            finalize=True,
+                        )
 
                     if ids:
                         for event_id in ids:

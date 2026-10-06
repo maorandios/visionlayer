@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 # Fix unused Any import if we need numpy - use ndarray
 from typing import Any
 
@@ -40,7 +41,7 @@ def apply_box_label(
     class_name: str,
 ) -> None:
     color = _BOX_BGR.get(class_name, (220, 220, 220))
-    x1, y1, x2, y2 = [int(round(v)) for v in bbox]
+    x1, y1, x2, y2 = [round(v) for v in bbox]
     h, w = frame.shape[:2]
     x1, y1 = max(0, x1), max(0, y1)
     x2, y2 = min(w - 1, x2), min(h - 1, y2)
@@ -178,7 +179,7 @@ def build_best_frame_cards(
     for class_name, info in sorted(best_by_class.items(), key=lambda kv: -float(kv[1].confidence)):
         conf = float(info.confidence)
         out_path = frames_dir / f"{job_id}_{class_name}.jpg"
-        label = f"{class_he(class_name)} {int(round(conf * 100))}%"
+        label = f"{class_he(class_name)} {round(conf * 100)}%"
         ok = extract_annotated_frame(
             video_path,
             frame_index=int(info.frame_index),
@@ -192,7 +193,7 @@ def build_best_frame_cards(
                 "class": class_name,
                 "class_he": class_he(class_name),
                 "confidence": round(conf, 4),
-                "confidence_pct": int(round(conf * 100)),
+                "confidence_pct": round(conf * 100),
                 "timestamp_sec": round(float(info.timestamp_sec), 3),
                 "frame_index": int(info.frame_index),
                 "track_id": int(info.track_id),

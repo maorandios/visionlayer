@@ -127,6 +127,49 @@ class ZonePresenceTracker:
             return None
         return max(0.0, (at - state.entered_at).total_seconds())
 
+    def expire_stale(
+        self,
+        *,
+        camera_id: str,
+        now: datetime,
+        max_gap_sec: float,
+    ) -> list[tuple[int, str, ZoneTransition]]:
+        """Close presences not refreshed for more than ``max_gap_sec``.
+
+        Returns (track_id, object_class, zone_exit transition) tuples. The exit time is
+        the last time the track was actually seen — not ``now`` — so dwell durations stay
+        honest. ``max_gap_sec < 0`` flushes every presence for the camera.
+        """
+        closed: list[tuple[int, str, ZoneTransition]] = []
+        for key in list(self._states.keys()):
+            cam, track_id, zone_id = key
+            if cam != camera_id:
+                continue
+            state = self._states[key]
+            gap = (now - state.last_seen_at).total_seconds()
+            if max_gap_sec >= 0 and gap <= max_gap_sec:
+                continue
+            del self._states[key]
+            at = state.last_seen_at
+            duration = max(0.0, (at - state.entered_at).total_seconds())
+            closed.append(
+                (
+                    track_id,
+                    state.object_class,
+                    ZoneTransition(
+                        kind="zone_exit",
+                        zone_id=zone_id,
+                        duration_seconds=duration,
+                        entered_at=state.entered_at,
+                        occurrence_id=f"exit:{camera_id}:{track_id}:{zone_id}:{at.isoformat()}",
+                    ),
+                )
+            )
+        return closed
+
+    def flush_camera(self, camera_id: str, *, now: datetime) -> list[tuple[int, str, ZoneTransition]]:
+        return self.expire_stale(camera_id=camera_id, now=now, max_gap_sec=-1.0)
+
     def clear(self) -> None:
         self._states.clear()
 

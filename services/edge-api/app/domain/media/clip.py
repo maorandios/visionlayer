@@ -25,7 +25,7 @@ def _ffmpeg_exe() -> str | None:
         import imageio_ffmpeg
 
         return imageio_ffmpeg.get_ffmpeg_exe()
-    except Exception:
+    except (ImportError, OSError, RuntimeError):
         return None
 
 
@@ -112,8 +112,8 @@ def _extract_with_opencv(video: Path, out_path: Path, *, start: float, end: floa
             logger.warning("event_clip_opencv_failed reason=size")
             return False
 
-        start_idx = max(0, int(round(start * fps)))
-        end_idx = max(start_idx + 1, int(round(end * fps)))
+        start_idx = max(0, round(start * fps))
+        end_idx = max(start_idx + 1, round(end * fps))
 
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(out_path), fourcc, fps, (width, height))
