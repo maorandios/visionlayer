@@ -7,7 +7,7 @@ import { RuleBuilderForm, validateAndBuild } from "@/components/rules/RuleBuilde
 import { LoadingBlock } from "@/components/ui/StateBlock";
 import { api } from "@/lib/api";
 import type { RuleBuilderForm as RuleForm } from "@/lib/rule-builder";
-import type { Camera, Zone } from "@/lib/types";
+import type { Camera, Line, Zone } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { t } from "@/i18n/he";
 
@@ -16,12 +16,18 @@ const initial: RuleForm = {
   objectClass: "person",
   cameraId: "",
   zoneId: "",
+  lineId: "",
+  trigger: "zone_enter",
+  direction: "any",
   scheduleFrom: "00:00",
   scheduleTo: "23:59",
   minDurationSeconds: 5,
   cooldownSeconds: 30,
   pushNotification: true,
   enabled: true,
+  countThreshold: 5,
+  countOperator: "gte",
+  aggregationWindowSeconds: 600,
 };
 
 function NewRuleInner() {
@@ -39,9 +45,11 @@ function NewRuleInner() {
     objectClass: presetClass || initial.objectClass,
     minDurationSeconds: fromLab ? 0 : initial.minDurationSeconds,
     cooldownSeconds: fromLab ? 0 : initial.cooldownSeconds,
+    trigger: fromLab ? "zone_enter" : initial.trigger,
   });
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,13 +60,19 @@ function NewRuleInner() {
       const cams = await api.cameras.list(token);
       setCameras(cams);
       const camId = presetCamera || cams[0]?.id || "";
-      const all: Zone[] = [];
-      for (const c of cams) all.push(...(await api.zones.listForCamera(token, c.id)));
-      setZones(all);
+      const allZones: Zone[] = [];
+      const allLines: Line[] = [];
+      for (const c of cams) {
+        allZones.push(...(await api.zones.listForCamera(token, c.id)));
+        allLines.push(...(await api.lines.listForCamera(token, c.id)));
+      }
+      setZones(allZones);
+      setLines(allLines);
       setForm((f) => ({
         ...f,
         cameraId: f.cameraId || camId,
-        zoneId: f.zoneId || all.find((z) => z.camera_id === (f.cameraId || camId))?.id || "",
+        zoneId: f.zoneId || allZones.find((z) => z.camera_id === (f.cameraId || camId))?.id || "",
+        lineId: f.lineId || allLines.find((ln) => ln.camera_id === (f.cameraId || camId))?.id || "",
         objectClass: presetClass || f.objectClass,
         minDurationSeconds: fromLab ? 0 : f.minDurationSeconds,
         cooldownSeconds: fromLab ? 0 : f.cooldownSeconds,
@@ -106,6 +120,7 @@ function NewRuleInner() {
         onChange={setForm}
         cameras={cameras}
         zones={zones}
+        lines={lines}
         errors={errors}
       />
       <Button onClick={onSave} disabled={saving}>

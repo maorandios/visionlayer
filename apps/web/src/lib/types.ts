@@ -34,14 +34,45 @@ export type Zone = {
   created_at: string;
 };
 
+export type Line = {
+  id: string;
+  camera_id: string;
+  name: string;
+  points: number[][];
+  direction: "any" | "a_to_b" | "b_to_a" | string;
+  enabled: boolean;
+  created_at: string;
+};
+
 export type RuleAction = { type: "push_notification" | "create_event" };
 
 export type RuleConditions = {
   object_classes: string[];
   camera_id?: string | null;
   zone_id?: string | null;
+  line_id?: string | null;
+  direction?: "any" | "a_to_b" | "b_to_a" | string | null;
+  trigger?:
+    | "zone_presence"
+    | "zone_enter"
+    | "zone_exit"
+    | "line_cross"
+    | "dwell"
+    | "count_threshold"
+    | string
+    | null;
   schedule?: { from: string; to: string; days?: number[]; timezone?: string };
   min_duration_seconds?: number;
+  count?: number | null;
+  threshold?: number | null;
+  operator?: "gte" | "gt" | "lte" | "lt" | "eq" | string | null;
+  aggregation_window_seconds?: number | null;
+  aggregation?: {
+    metric?: string;
+    window_seconds?: number;
+    operator?: string;
+    threshold?: number;
+  } | null;
 };
 
 export type Rule = {

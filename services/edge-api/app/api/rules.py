@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.db import get_db
-from app.adapters.models import Camera, Rule, Zone
+from app.adapters.models import Camera, Line, Rule, Zone
 from app.api.schemas import (
     RuleCreate,
     RuleResponse,
@@ -21,6 +21,7 @@ from app.api.schemas import (
 from app.core.deps import CurrentUser, get_current_user
 from app.core.errors import NotFoundError
 from app.core.ids import new_id, slugify
+from app.domain.rules.engine import aggregation_from_conditions, infer_trigger
 
 router = APIRouter(prefix="/api/v1/rules", tags=["rules"])
 
@@ -50,18 +51,54 @@ async def _validate_references(
     errors: list[str] = []
     camera_id = conditions.get("camera_id")
     zone_id = conditions.get("zone_id")
+    line_id = conditions.get("line_id")
+    trigger = infer_trigger(conditions)
+
+    if not conditions.get("object_classes"):
+        errors.append("חובה לציין לפחות מחלקת אובייקט אחת")
+
     if camera_id and await db.get(Camera, camera_id) is None:
         errors.append(f"מצלמה לא נמצאה: {camera_id}")
+
     if zone_id:
         zone = await db.get(Zone, zone_id)
         if zone is None:
             errors.append(f"אזור לא נמצא: {zone_id}")
         elif camera_id and zone.camera_id != camera_id:
             errors.append("האזור אינו שייך למצלמה שצוינה בחוק")
-    if not conditions.get("object_classes"):
-        errors.append("חובה לציין לפחות מחלקת אובייקט אחת")
-    if not zone_id:
-        errors.append("חובה לציין zone_id בשלב זה")
+
+    if line_id:
+        line = await db.get(Line, line_id)
+        if line is None:
+            errors.append(f"קו לא נמצא: {line_id}")
+        elif camera_id and line.camera_id != camera_id:
+            errors.append("הקו אינו שייך למצלמה שצוינה בחוק")
+
+    zone_triggers = {"zone_presence", "zone_enter", "zone_exit", "dwell"}
+    if trigger in zone_triggers and not zone_id:
+        errors.append("חובה לציין אזור לחוק זה")
+    if trigger == "dwell" and int(conditions.get("min_duration_seconds") or 0) <= 0:
+        errors.append("חוק שהייה דורש משך מינימלי גדול מאפס")
+    if trigger == "line_cross" and not line_id:
+        errors.append("חובה לציין קו לחצייה")
+    if trigger == "count_threshold":
+        agg = aggregation_from_conditions(conditions)
+        if agg.get("threshold") is None:
+            errors.append("חובה לציין סף ספירה")
+        if not zone_id and not line_id:
+            errors.append("חוק סף ספירה דורש אזור או קו")
+        op = str(agg.get("operator") or "gte").lower()
+        if op not in {"gte", "gt", "lte", "lt", "eq"}:
+            errors.append("אופרטור סף לא תקין")
+    if trigger not in {
+        "zone_presence",
+        "zone_enter",
+        "zone_exit",
+        "line_cross",
+        "dwell",
+        "count_threshold",
+    }:
+        errors.append(f"סוג טריגר לא נתמך: {trigger}")
     return errors
 
 

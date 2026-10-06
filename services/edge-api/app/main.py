@@ -24,13 +24,16 @@ from app.api.rules import router as rules_router
 from app.api.simulate import router as simulate_router
 from app.api.video_lab import router as video_lab_router
 from app.api.zones import router as zones_router
+from app.api.lines import router as lines_router
 from app.bus.event_bus import bus
 from app.core.bootstrap import ensure_bootstrap
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import setup_logging
+from app.domain.counters import CounterStore
 from app.domain.pipeline.detection_pipeline import TOPIC_DETECTIONS, DetectionPipeline
 from app.domain.rules.tracker import ZonePresenceTracker
+from app.domain.spatial.line_tracker import LineCrossingTracker
 
 
 @asynccontextmanager
@@ -51,9 +54,18 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
 
     tracker = ZonePresenceTracker()
-    pipeline = DetectionPipeline(session_factory, tracker=tracker)
+    line_tracker = LineCrossingTracker()
+    counters = CounterStore()
+    pipeline = DetectionPipeline(
+        session_factory,
+        tracker=tracker,
+        line_tracker=line_tracker,
+        counters=counters,
+    )
     app.state.detection_pipeline = pipeline
     app.state.zone_tracker = tracker
+    app.state.line_tracker = line_tracker
+    app.state.counters = counters
     app.state.last_batch_event_ids = []
 
     # Reset global bus handlers to avoid duplicate subscriptions across reloads/tests
@@ -98,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(cameras_router)
     app.include_router(zones_router)
+    app.include_router(lines_router)
     app.include_router(rules_router)
     app.include_router(events_router)
     app.include_router(simulate_router)

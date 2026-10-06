@@ -13,6 +13,7 @@ import { objectClassHe } from "@/lib/format";
 import type {
   BenchmarkHistoryItem,
   BenchmarkRun,
+  Line,
   Rule,
   TrackReviewStatus,
   VideoLabAsset,
@@ -232,6 +233,7 @@ function VideoLabInner() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraRules, setCameraRules] = useState<Rule[]>([]);
   const [cameraZones, setCameraZones] = useState<Zone[]>([]);
+  const [cameraLines, setCameraLines] = useState<Line[]>([]);
   const [runHistory, setRunHistory] = useState<BenchmarkHistoryItem[]>([]);
   const [benchmark, setBenchmark] = useState<BenchmarkRun | null>(null);
   const restoredRunRef = useRef<string | null>(null);
@@ -303,19 +305,22 @@ function VideoLabInner() {
     if (!token || !selected) {
       setCameraRules([]);
       setCameraZones([]);
+      setCameraLines([]);
       setRunHistory([]);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const [rules, zones, runs] = await Promise.all([
+        const [rules, zones, lines, runs] = await Promise.all([
           api.rules.list(token),
           api.zones.listForCamera(token, selected.camera_id),
+          api.lines.listForCamera(token, selected.camera_id),
           api.videoLab.listRuns(token, selected.id),
         ]);
         if (cancelled) return;
         setCameraZones(zones);
+        setCameraLines(lines);
         setCameraRules(
           rules.filter(
             (r) => !r.conditions.camera_id || r.conditions.camera_id === selected.camera_id,
@@ -359,6 +364,7 @@ function VideoLabInner() {
         if (!cancelled) {
           setCameraRules([]);
           setCameraZones([]);
+          setCameraLines([]);
           setRunHistory([]);
         }
       }
@@ -535,6 +541,12 @@ function VideoLabInner() {
       }`
     : "#";
 
+  const lineCreateHref = selected
+    ? `/cameras/${selected.camera_id}/lines/new?lab=1&assetId=${encodeURIComponent(selected.id)}${
+        runId ? `&runId=${encodeURIComponent(runId)}` : ""
+      }`
+    : "#";
+
   const ruleTargetClasses = new Set(
     cameraRules.filter((r) => r.enabled).flatMap((r) => r.conditions.object_classes ?? []),
   );
@@ -676,6 +688,9 @@ function VideoLabInner() {
             {cameraZones.length === 0 ? (
               <p className="text-sm text-ink-muted">{t("noZonesForCam")}</p>
             ) : null}
+            {cameraLines.length === 0 ? (
+              <p className="text-sm text-ink-muted">{t("emptyLines")}</p>
+            ) : null}
             {cameraRules.length === 0 ? (
               <p className="text-sm text-ink-muted">{t("noRulesForCam")}</p>
             ) : (
@@ -683,12 +698,21 @@ function VideoLabInner() {
                 {cameraRules.map((r) => {
                   const cls = r.conditions.object_classes?.[0];
                   const zone = cameraZones.find((z) => z.id === r.conditions.zone_id);
+                  const line = cameraLines.find((ln) => ln.id === r.conditions.line_id);
+                  const trigger = r.conditions.trigger ?? "zone_presence";
                   return (
                     <li key={r.id} className="rounded-xl border border-border bg-surface px-3 py-2">
                       <p className="font-medium">{r.name}</p>
                       <p className="text-xs text-ink-muted">
-                        מחפש: {objectClassHe(cls)} · אזור: {zone?.name ?? "—"} · משך מינ׳:{" "}
-                        {r.conditions.min_duration_seconds ?? 0}ש׳
+                        מחפש: {objectClassHe(cls)} · טריגר: {trigger}
+                        {zone ? ` · אזור: ${zone.name}` : ""}
+                        {line ? ` · קו: ${line.name}` : ""}
+                        {r.conditions.min_duration_seconds
+                          ? ` · משך: ${r.conditions.min_duration_seconds}ש׳`
+                          : ""}
+                        {r.conditions.threshold != null
+                          ? ` · סף: ${r.conditions.threshold}`
+                          : ""}
                         {!r.enabled ? " · כבוי" : ""}
                       </p>
                     </li>
@@ -699,6 +723,9 @@ function VideoLabInner() {
             <div className="flex flex-wrap gap-2 pt-1">
               <Link href={zoneCreateHref}>
                 <Button variant="secondary">{t("drawZone")}</Button>
+              </Link>
+              <Link href={lineCreateHref}>
+                <Button variant="secondary">{t("drawLine")}</Button>
               </Link>
               <Link href={ruleCreateHref}>
                 <Button variant="secondary">{t("createRuleForCam")}</Button>

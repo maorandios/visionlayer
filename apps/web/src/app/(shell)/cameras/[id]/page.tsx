@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
 import { api } from "@/lib/api";
-import type { Camera, Rule, Zone } from "@/lib/types";
+import type { Camera, Line, Rule, Zone } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { t } from "@/i18n/he";
 
@@ -16,6 +16,7 @@ export default function CameraDetailPage() {
   const { token } = useAuth();
   const [camera, setCamera] = useState<Camera | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +27,15 @@ export default function CameraDetailPage() {
     setError(null);
     try {
       const id = params.id;
-      const [cam, z, r] = await Promise.all([
+      const [cam, z, ln, r] = await Promise.all([
         api.cameras.get(token, id),
         api.zones.listForCamera(token, id),
+        api.lines.listForCamera(token, id),
         api.rules.list(token),
       ]);
       setCamera(cam);
       setZones(z);
+      setLines(ln);
       setRules(r.filter((rule) => rule.conditions.camera_id === id));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("errorLoad"));
@@ -91,6 +94,31 @@ export default function CameraDetailPage() {
                   <p className="font-medium text-ink">{z.name}</p>
                   <p className="text-xs text-ink-muted">
                     {z.enabled ? t("enabled") : t("disabled")} · {z.points.length} נקודות
+                  </p>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-ink">{t("linesSection")}</h2>
+          <Link href={`/cameras/${camera.id}/lines/new`}>
+            <Button variant="secondary">{t("addLine")}</Button>
+          </Link>
+        </div>
+        {lines.length === 0 ? (
+          <p className="text-sm text-ink-muted">{t("emptyLines")}</p>
+        ) : (
+          <ul className="space-y-2">
+            {lines.map((ln) => (
+              <li key={ln.id}>
+                <Card>
+                  <p className="font-medium text-ink">{ln.name}</p>
+                  <p className="text-xs text-ink-muted">
+                    {ln.enabled ? t("enabled") : t("disabled")} · {ln.direction}
                   </p>
                 </Card>
               </li>

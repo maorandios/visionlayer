@@ -126,8 +126,13 @@ async def _publish_factory(request: Request, db: AsyncSession):
                 ids.extend(list(getattr(request.app.state, "last_batch_event_ids", []) or []))
         else:
             tracker = getattr(request.app.state, "zone_tracker", None)
-            if tracker is not None and detections:
-                tracker.clear_camera(str(detections[0].get("camera_id")))
+            line_tracker = getattr(request.app.state, "line_tracker", None)
+            if detections:
+                cam = str(detections[0].get("camera_id"))
+                if tracker is not None:
+                    tracker.clear_camera(cam)
+                if line_tracker is not None:
+                    line_tracker.clear_camera(cam)
             ids = await pipeline.handle_batch(detections, once_per_track=True)
 
         if ids:
@@ -145,6 +150,12 @@ def _clear_tracker_factory(request: Request):
         tracker = getattr(request.app.state, "zone_tracker", None)
         if tracker is not None:
             tracker.clear_camera(camera_id)
+        line_tracker = getattr(request.app.state, "line_tracker", None)
+        if line_tracker is not None:
+            line_tracker.clear_camera(camera_id)
+        counters = getattr(request.app.state, "counters", None)
+        if counters is not None:
+            counters.clear()
 
     return clear_tracker
 
@@ -197,9 +208,13 @@ async def analyze_asset(
                             ids.extend(list(getattr(app.state, "last_batch_event_ids", []) or []))
                     else:
                         if detections:
+                            cam = str(detections[0].get("camera_id"))
                             tracker = getattr(app.state, "zone_tracker", None)
                             if tracker is not None:
-                                tracker.clear_camera(str(detections[0].get("camera_id")))
+                                tracker.clear_camera(cam)
+                            line_tracker = getattr(app.state, "line_tracker", None)
+                            if line_tracker is not None:
+                                line_tracker.clear_camera(cam)
                         ids = await pipeline.handle_batch(detections, once_per_track=True)
 
                     if ids:
@@ -213,6 +228,12 @@ async def analyze_asset(
                     tracker = getattr(app.state, "zone_tracker", None)
                     if tracker is not None:
                         tracker.clear_camera(camera_id)
+                    line_tracker = getattr(app.state, "line_tracker", None)
+                    if line_tracker is not None:
+                        line_tracker.clear_camera(camera_id)
+                    counters = getattr(app.state, "counters", None)
+                    if counters is not None:
+                        counters.clear()
 
                 running = await video_lab.get_job(session, job_id)
                 await video_lab.run_analysis(

@@ -1,4 +1,4 @@
-"""Detection pipeline: unified detections → zones → rules → events."""
+"""Detection pipeline: detections → spatial events → rules → product Events."""
 
 from __future__ import annotations
 
@@ -10,9 +10,20 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.models import Camera, Event, Rule, Zone
-from app.domain.rules.engine import DetectionContext, RuleSnapshot, evaluate_rules
+from app.adapters.models import Camera, Event, Line, Rule, Zone
+from app.domain.counters import CounterStore
+from app.domain.rules.engine import (
+    DetectionContext,
+    RuleSnapshot,
+    aggregation_from_conditions,
+    counter_key_for_rule,
+    evaluate_rules,
+    infer_trigger,
+)
 from app.domain.rules.tracker import ZonePresenceTracker
+from app.domain.spatial import SpatialEvent
+from app.domain.spatial.line_tracker import LineCrossingTracker
+from app.domain.spatial.lines import detection_point_normalized
 from app.domain.zones.geometry import detection_in_zone
 
 logger = logging.getLogger(__name__)
@@ -27,12 +38,19 @@ def _to_datetime(timestamp: float) -> datetime:
 class DetectionPipeline:
     """Consumes unified Detection payloads and persists matching Events."""
 
-    def __init__(self, session_factory: Any, tracker: ZonePresenceTracker | None = None) -> None:
+    def __init__(
+        self,
+        session_factory: Any,
+        tracker: ZonePresenceTracker | None = None,
+        line_tracker: LineCrossingTracker | None = None,
+        counters: CounterStore | None = None,
+    ) -> None:
         self._session_factory = session_factory
         self.tracker = tracker or ZonePresenceTracker()
+        self.line_tracker = line_tracker or LineCrossingTracker()
+        self.counters = counters or CounterStore()
 
     async def handle(self, _topic: str, detection: dict[str, Any]) -> list[str]:
-        """Process one detection. Returns created event ids."""
         return await self.handle_batch([detection], once_per_track=False)
 
     async def handle_batch(
@@ -41,11 +59,6 @@ class DetectionPipeline:
         *,
         once_per_track: bool = True,
     ) -> list[str]:
-        """Process many detections in one DB session (Video Lab fast path).
-
-        once_per_track: emit at most one event per (rule_id, track_id) —
-        avoids flooding when cooldown=0 on long tracks.
-        """
         valid = [d for d in detections if d.get("type") == "detection"]
         if not valid:
             return []
@@ -61,6 +74,12 @@ class DetectionPipeline:
             zones = list(zones_result.scalars().all())
             enabled_zones = [z for z in zones if z.enabled and z.kind == "polygon"]
             enabled_zone_ids = frozenset(z.id for z in enabled_zones)
+            zone_names = {z.id: z.name for z in zones}
+
+            lines_result = await session.execute(select(Line).where(Line.camera_id == camera_id))
+            lines = list(lines_result.scalars().all())
+            enabled_lines = [ln for ln in lines if ln.enabled]
+            line_names = {ln.id: ln.name for ln in lines}
 
             rules_result = await session.execute(select(Rule))
             rule_rows = list(rules_result.scalars().all())
@@ -68,6 +87,21 @@ class DetectionPipeline:
                 r.id: r.last_triggered_at for r in rule_rows
             }
             actions_by_rule = {r.id: list(r.actions_json or []) for r in rule_rows}
+            rule_row_by_id = {r.id: r for r in rule_rows}
+
+            # Dwell thresholds per zone from rules (max among dwell/presence rules)
+            dwell_by_zone: dict[str, float] = {}
+            for r in rule_rows:
+                cond = dict(r.conditions_json or {})
+                trigger = infer_trigger(cond)
+                zid = cond.get("zone_id")
+                if not zid:
+                    continue
+                if trigger == "dwell":
+                    dwell_by_zone[zid] = float(cond.get("min_duration_seconds") or 0)
+                elif trigger == "zone_presence" and int(cond.get("min_duration_seconds") or 0) > 0:
+                    # also emit dwell spatial for presence rules with duration, for diagnostics
+                    pass
 
             def _snapshots() -> list[RuleSnapshot]:
                 return [
@@ -84,8 +118,7 @@ class DetectionPipeline:
                 ]
 
             created_ids: list[str] = []
-            fired: set[tuple[str, int]] = set()
-            rule_row_by_id = {r.id: r for r in rule_rows}
+            fired: set[str] = set()
 
             for detection in valid:
                 if str(detection.get("camera_id")) != camera_id:
@@ -96,55 +129,192 @@ class DetectionPipeline:
                 frame_size = detection.get("frame_size") or [1920, 1080]
                 confidence = float(detection.get("confidence") or 0)
                 at = _to_datetime(detection["timestamp"])
+                if track_id is None:
+                    continue
+                track_id_int = int(track_id)
 
                 active_zone_ids: set[str] = set()
                 zone_durations: dict[str, float] = {}
+                spatial: list[SpatialEvent] = []
 
-                if track_id is not None:
-                    track_id_int = int(track_id)
-                    for zone in enabled_zones:
-                        inside = detection_in_zone(bbox, frame_size, zone.points_json)
-                        state = self.tracker.update(
-                            camera_id=camera_id,
-                            track_id=track_id_int,
-                            zone_id=zone.id,
-                            object_class=object_class,
-                            inside=inside,
-                            at=at,
-                        )
-                        if state is not None:
+                for zone in enabled_zones:
+                    inside = detection_in_zone(bbox, frame_size, zone.points_json)
+                    dwell_thr = dwell_by_zone.get(zone.id)
+                    transitions = self.tracker.update(
+                        camera_id=camera_id,
+                        track_id=track_id_int,
+                        zone_id=zone.id,
+                        object_class=object_class,
+                        inside=inside,
+                        at=at,
+                        dwell_threshold_sec=dwell_thr,
+                    )
+                    for tr in transitions:
+                        if tr.kind == "zone_presence":
                             active_zone_ids.add(zone.id)
-                            duration = self.tracker.duration_seconds(
+                            zone_durations[zone.id] = tr.duration_seconds
+                        spatial.append(
+                            SpatialEvent(
+                                kind=tr.kind,  # type: ignore[arg-type]
                                 camera_id=camera_id,
                                 track_id=track_id_int,
-                                zone_id=zone.id,
-                                at=at,
+                                object_class=object_class,
+                                confidence=confidence,
+                                timestamp=at,
+                                zone_id=tr.zone_id,
+                                duration_seconds=tr.duration_seconds,
+                                occurrence_id=tr.occurrence_id,
                             )
-                            if duration is not None:
-                                zone_durations[zone.id] = duration
+                        )
+
+                try:
+                    point = detection_point_normalized(bbox, frame_size)
+                except ValueError:
+                    point = None
+
+                if point is not None:
+                    for ln in enabled_lines:
+                        cross = self.line_tracker.update(
+                            camera_id=camera_id,
+                            track_id=track_id_int,
+                            line_id=ln.id,
+                            points=list(ln.points_json or []),
+                            point=point,
+                            at=at,
+                        )
+                        if cross is not None:
+                            spatial.append(
+                                SpatialEvent(
+                                    kind="line_cross",
+                                    camera_id=camera_id,
+                                    track_id=track_id_int,
+                                    object_class=object_class,
+                                    confidence=confidence,
+                                    timestamp=at,
+                                    line_id=cross.line_id,
+                                    direction=cross.direction,
+                                    point=cross.point,
+                                    occurrence_id=cross.occurrence_id,
+                                )
+                            )
+
+                # Update unique counters for count_threshold rules when a relevant spatial event fires
+                threshold_fires: dict[str, dict[str, Any]] = {}
+                snaps = _snapshots()
+                for rule in snaps:
+                    if not rule.enabled:
+                        continue
+                    if infer_trigger(rule.conditions) != "count_threshold":
+                        continue
+                    # Count on enter or line_cross matching this rule's target
+                    relevant = False
+                    for ev in spatial:
+                        if rule.conditions.get("line_id"):
+                            if (
+                                ev.kind == "line_cross"
+                                and ev.line_id == rule.conditions.get("line_id")
+                                and (
+                                    not rule.conditions.get("direction")
+                                    or rule.conditions.get("direction") == "any"
+                                    or rule.conditions.get("direction") == ev.direction
+                                )
+                            ):
+                                relevant = True
+                                break
+                        elif rule.conditions.get("zone_id"):
+                            if (
+                                ev.kind == "zone_enter"
+                                and ev.zone_id == rule.conditions.get("zone_id")
+                            ):
+                                relevant = True
+                                break
+                    if not relevant:
+                        continue
+                    if rule.conditions.get("object_classes"):
+                        if object_class not in rule.conditions["object_classes"]:
+                            continue
+                    if rule.conditions.get("camera_id") and rule.conditions["camera_id"] != camera_id:
+                        continue
+
+                    agg = aggregation_from_conditions(rule.conditions)
+                    thr = agg.get("threshold")
+                    if thr is None:
+                        continue
+                    key = counter_key_for_rule(rule, DetectionContext(
+                        camera_id=camera_id,
+                        object_class=object_class,
+                        track_id=track_id_int,
+                        confidence=confidence,
+                        timestamp=at,
+                        active_zone_ids=frozenset(),
+                        zone_durations={},
+                        camera_enabled=True,
+                        enabled_zone_ids=frozenset(),
+                    ))
+                    _count, fire = self.counters.observe(
+                        key=key,
+                        track_id=track_id_int,
+                        at=at,
+                        window_seconds=int(agg["window_seconds"]) if agg.get("window_seconds") else None,
+                        operator=str(agg.get("operator") or "gte"),
+                        threshold=float(thr),
+                    )
+                    if fire is not None:
+                        threshold_fires[key] = {
+                            "count": fire.count,
+                            "threshold": fire.threshold,
+                            "operator": fire.operator,
+                            "window_seconds": fire.window_seconds,
+                        }
 
                 ctx = DetectionContext(
                     camera_id=camera_id,
                     object_class=object_class,
-                    track_id=int(track_id) if track_id is not None else None,
+                    track_id=track_id_int,
                     confidence=confidence,
                     timestamp=at,
                     active_zone_ids=frozenset(active_zone_ids),
                     zone_durations=zone_durations,
                     camera_enabled=True,
                     enabled_zone_ids=enabled_zone_ids,
+                    zone_names=zone_names,
+                    line_names=line_names,
+                    spatial_events=tuple(spatial),
+                    threshold_fires=threshold_fires or None,
                 )
-                matches = evaluate_rules(_snapshots(), ctx)
+                matches = evaluate_rules(snaps, ctx)
 
                 for match in matches:
-                    tid_key = int(track_id) if track_id is not None else -1
-                    fire_key = (match.rule_id, tid_key)
-                    if once_per_track and fire_key in fired:
+                    dedupe = match.dedupe_key or f"{match.rule_id}:{track_id_int}"
+                    if once_per_track and dedupe in fired:
                         continue
                     if once_per_track:
-                        fired.add(fire_key)
+                        fired.add(dedupe)
 
                     event_id = f"evt_{uuid.uuid4().hex[:12]}"
+                    video_ts = detection.get("video_timestamp_sec")
+                    payload: dict[str, Any] = {
+                        "detection": detection,
+                        "duration_seconds": match.duration_seconds,
+                        "rule_name": match.rule_name,
+                        "actions": actions_by_rule.get(match.rule_id, []),
+                        "spatial_event": match.spatial_event,
+                        "track_id": track_id_int,
+                    }
+                    if video_ts is not None:
+                        payload["video_timestamp_sec"] = video_ts
+                    if match.zone_id:
+                        payload["zone_id"] = match.zone_id
+                    if match.line_id:
+                        payload["line_id"] = match.line_id
+                    if match.direction:
+                        payload["direction"] = match.direction
+                    if match.count is not None:
+                        payload["count"] = match.count
+                        payload["threshold"] = match.threshold
+                        payload["window_seconds"] = match.window_seconds
+                        payload["operator"] = match.operator
+
                     event = Event(
                         id=event_id,
                         camera_id=camera_id,
@@ -152,19 +322,14 @@ class DetectionPipeline:
                         type=match.event_type,
                         severity=match.severity,
                         object_class=object_class,
-                        track_id=int(track_id) if track_id is not None else None,
+                        track_id=track_id_int,
                         zone_id=match.zone_id,
                         confidence=confidence,
                         started_at=at,
                         ended_at=None,
                         state="new",
                         message_he=match.message_he,
-                        payload_json={
-                            "detection": detection,
-                            "duration_seconds": match.duration_seconds,
-                            "rule_name": match.rule_name,
-                            "actions": actions_by_rule.get(match.rule_id, []),
-                        },
+                        payload_json=payload,
                     )
                     session.add(event)
                     rule_row = rule_row_by_id.get(match.rule_id)

@@ -15,7 +15,7 @@ import cv2
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.models import Camera, Event, Rule, VideoLabAsset, VideoLabJob, Zone
+from app.adapters.models import Camera, Event, Line, Rule, VideoLabAsset, VideoLabJob, Zone
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFoundError, ValidationAppError
 from app.domain.video_lab import analysis_lock
@@ -400,6 +400,8 @@ async def run_analysis(
 
         zones_result = await session.execute(select(Zone).where(Zone.camera_id == asset.camera_id))
         zones = list(zones_result.scalars().all())
+        lines_result = await session.execute(select(Line).where(Line.camera_id == asset.camera_id))
+        lines = list(lines_result.scalars().all())
         rules = all_rules
 
         first_seen = first_seen_by_class(result.detections, base_unix_ts=result.base_unix_ts)
@@ -408,6 +410,7 @@ async def run_analysis(
             camera_id=asset.camera_id,
             rules=rules,
             zones=zones,
+            lines=lines,
             detections=result.detections,
             base_unix_ts=result.base_unix_ts,
             triggered_rule_ids=rules_triggered,

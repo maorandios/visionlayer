@@ -7,7 +7,7 @@ import { RuleBuilderForm, validateAndBuild } from "@/components/rules/RuleBuilde
 import { LoadingBlock } from "@/components/ui/StateBlock";
 import { api } from "@/lib/api";
 import { ruleToForm, type RuleBuilderForm as RuleForm } from "@/lib/rule-builder";
-import type { Camera, Zone } from "@/lib/types";
+import type { Camera, Line, Zone } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { t } from "@/i18n/he";
 
@@ -18,6 +18,7 @@ export default function EditRulePage() {
   const [form, setForm] = useState<RuleForm | null>(null);
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,10 +33,13 @@ export default function EditRulePage() {
       setForm(ruleToForm(rule));
       setCameras(cams);
       const allZones: Zone[] = [];
+      const allLines: Line[] = [];
       for (const cam of cams) {
         allZones.push(...(await api.zones.listForCamera(token, cam.id)));
+        allLines.push(...(await api.lines.listForCamera(token, cam.id)));
       }
       setZones(allZones);
+      setLines(allLines);
       setLoading(false);
     })();
   }, [token, id]);
@@ -61,7 +65,14 @@ export default function EditRulePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <h1 className="text-2xl font-semibold text-ink">{t("edit")}</h1>
-      <RuleBuilderForm form={form} onChange={setForm} cameras={cameras} zones={zones} errors={errors} />
+      <RuleBuilderForm
+        form={form}
+        onChange={setForm}
+        cameras={cameras}
+        zones={zones}
+        lines={lines}
+        errors={errors}
+      />
       <Button onClick={onSave} disabled={saving}>
         {t("save")}
       </Button>

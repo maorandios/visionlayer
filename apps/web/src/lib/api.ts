@@ -2,6 +2,7 @@ import type {
   Camera,
   EventItem,
   HubInfo,
+  Line,
   Rule,
   User,
   Zone,
@@ -144,6 +145,29 @@ export const api = {
     },
     delete(token: string, zoneId: string) {
       return request<void>(`/api/v1/zones/${zoneId}`, { method: "DELETE" }, token);
+    },
+  },
+
+  lines: {
+    listForCamera(token: string, cameraId: string) {
+      return request<Line[]>(`/api/v1/cameras/${cameraId}/lines`, {}, token);
+    },
+    create(token: string, cameraId: string, body: Record<string, unknown>) {
+      return request<Line>(
+        `/api/v1/cameras/${cameraId}/lines`,
+        { method: "POST", body: JSON.stringify(body) },
+        token,
+      );
+    },
+    update(token: string, lineId: string, body: Record<string, unknown>) {
+      return request<Line>(
+        `/api/v1/lines/${lineId}`,
+        { method: "PATCH", body: JSON.stringify(body) },
+        token,
+      );
+    },
+    delete(token: string, lineId: string) {
+      return request<void>(`/api/v1/lines/${lineId}`, { method: "DELETE" }, token);
     },
   },
 

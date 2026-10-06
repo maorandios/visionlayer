@@ -76,6 +76,46 @@ class Zone(Base):
     camera: Mapped[Camera] = relationship(back_populates="zones")
 
 
+class Line(Base):
+    """Directional line for crossing rules (two normalized endpoints)."""
+
+    __tablename__ = "lines"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    camera_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("cameras.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    points_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+    direction: Mapped[str] = mapped_column(String(32), nullable=False, default="any")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CounterStateRow(Base):
+    """Optional persisted unique-count bucket (in-memory CounterStore is primary)."""
+
+    __tablename__ = "counter_states"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    counter_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    camera_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    zone_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    line_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    object_class: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    direction: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    rule_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    value: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    track_ids_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    window_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    threshold_fired: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class Rule(Base):
     __tablename__ = "rules"
 

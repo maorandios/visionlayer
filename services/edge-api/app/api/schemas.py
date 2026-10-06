@@ -121,8 +121,82 @@ class RuleConditions(BaseModel):
     object_classes: list[str] = Field(min_length=1)
     camera_id: str | None = None
     zone_id: str | None = None
+    line_id: str | None = None
+    direction: Literal["any", "a_to_b", "b_to_a"] | None = "any"
+    trigger: (
+        Literal[
+            "zone_presence",
+            "zone_enter",
+            "zone_exit",
+            "line_cross",
+            "dwell",
+            "count_threshold",
+        ]
+        | None
+    ) = None
     schedule: ScheduleSchema | None = None
     min_duration_seconds: int = Field(default=0, ge=0)
+    count: int | None = Field(default=None, ge=1)
+    threshold: float | None = None
+    operator: Literal["gte", "gt", "lte", "lt", "eq"] | None = "gte"
+    aggregation_window_seconds: int | None = Field(default=None, ge=1)
+    aggregation: dict[str, Any] | None = None
+
+
+class LineCreate(BaseModel):
+    id: str | None = Field(default=None, min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=200)
+    points: list[list[float]] = Field(min_length=2, max_length=2)
+    direction: Literal["any", "a_to_b", "b_to_a"] = "any"
+    enabled: bool = True
+
+    @field_validator("points")
+    @classmethod
+    def validate_points(cls, value: list[list[float]]) -> list[list[float]]:
+        if len(value) != 2:
+            raise ValueError("line requires exactly 2 points")
+        for point in value:
+            if len(point) != 2:
+                raise ValueError("each point must be [x, y]")
+            x, y = point
+            if not (0.0 <= float(x) <= 1.0 and 0.0 <= float(y) <= 1.0):
+                raise ValueError("coordinates must be normalized to 0–1")
+        return value
+
+
+class LineUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    points: list[list[float]] | None = None
+    direction: Literal["any", "a_to_b", "b_to_a"] | None = None
+    enabled: bool | None = None
+
+    @field_validator("points")
+    @classmethod
+    def validate_points(cls, value: list[list[float]] | None) -> list[list[float]] | None:
+        if value is None:
+            return value
+        if len(value) != 2:
+            raise ValueError("line requires exactly 2 points")
+        for point in value:
+            if len(point) != 2:
+                raise ValueError("each point must be [x, y]")
+            x, y = point
+            if not (0.0 <= float(x) <= 1.0 and 0.0 <= float(y) <= 1.0):
+                raise ValueError("coordinates must be normalized to 0–1")
+        return value
+
+
+class LineResponse(BaseModel):
+    id: str
+    camera_id: str
+    name: str
+    points: list[list[float]]
+    direction: str
+    enabled: bool
+    created_at: datetime
+
+
+# --- Rules ---
 
 
 class RuleAction(BaseModel):
