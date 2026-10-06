@@ -110,7 +110,8 @@ export const he = {
   storageHint: "תמונות וקליפים של אירועים נשמרים מקומית",
   usersHint: "ניהול משתמשים והרשאות",
   openMetricsForRun: "מדדי ההרצה",
-  videoLabMetricsHint: "מדדים אלו שייכים להרצה זו בלבד (scope: video_lab) ולא נספרים בייצור",
+  videoLabMetricsHint:
+    "מדדים אלו שייכים להרצה זו בלבד (scope: video_lab) ולא נספרים בייצור. אובייקטים ייחודיים נספרים בכל הפריים (לא לפי חוק); כניסות לאזור נספרות לפי האזור בלבד.",
 
   loginTitle: "התחברות",
   loginSubtitle: "הזינו פרטי גישה למערכת המקומית",
@@ -232,7 +233,7 @@ export const he = {
   linesSection: "קווי חצייה",
   addLine: "הוספת קו",
   emptyLines: "עדיין לא נוספו קווים",
-  tapToAddLinePoint: "לחצו על שתי נקודות לציור הקו (A ואז B)",
+  tapToAddLinePoint: "לחצו על שתי נקודות לציור הקו",
   uniqueTracks: "מסלולים ייחודיים",
   processingFps: "FPS עיבוד ממוצע",
   detectionsCount: "זיהויים",

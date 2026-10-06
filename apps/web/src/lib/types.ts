@@ -40,6 +40,9 @@ export type Line = {
   name: string;
   points: number[][];
   direction: "any" | "a_to_b" | "b_to_a" | string;
+  /** Human-readable direction names (e.g. "כניסה" / "יציאה"); optional. */
+  label_a_to_b?: string | null;
+  label_b_to_a?: string | null;
   enabled: boolean;
   created_at: string;
 };
@@ -72,6 +75,7 @@ export type RuleConditions = {
     window_seconds?: number;
     operator?: string;
     threshold?: number;
+    count_on?: string;
   } | null;
 };
 

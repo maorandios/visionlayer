@@ -148,6 +148,8 @@ class LineCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     points: list[list[float]] = Field(min_length=2, max_length=2)
     direction: Literal["any", "a_to_b", "b_to_a"] = "any"
+    label_a_to_b: str | None = Field(default=None, max_length=100)
+    label_b_to_a: str | None = Field(default=None, max_length=100)
     enabled: bool = True
 
     @field_validator("points")
@@ -168,6 +170,8 @@ class LineUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     points: list[list[float]] | None = None
     direction: Literal["any", "a_to_b", "b_to_a"] | None = None
+    label_a_to_b: str | None = Field(default=None, max_length=100)
+    label_b_to_a: str | None = Field(default=None, max_length=100)
     enabled: bool | None = None
 
     @field_validator("points")
@@ -192,6 +196,8 @@ class LineResponse(BaseModel):
     name: str
     points: list[list[float]]
     direction: str
+    label_a_to_b: str | None = None
+    label_b_to_a: str | None = None
     enabled: bool
     created_at: datetime
 

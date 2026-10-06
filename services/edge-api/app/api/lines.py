@@ -13,7 +13,7 @@ from app.adapters.models import Camera, Line
 from app.api.schemas import LineCreate, LineResponse, LineUpdate
 from app.core.deps import CurrentUser, get_current_user
 from app.core.errors import NotFoundError, ValidationAppError
-from app.core.ids import new_id, slugify
+from app.core.ids import id_from_name, new_id
 
 router = APIRouter(tags=["lines"])
 
@@ -25,6 +25,8 @@ def _to_response(line: Line) -> LineResponse:
         name=line.name,
         points=list(line.points_json),
         direction=line.direction or "any",
+        label_a_to_b=line.label_a_to_b,
+        label_b_to_a=line.label_b_to_a,
         enabled=line.enabled,
         created_at=line.created_at,
     )
@@ -60,7 +62,7 @@ async def create_line(
     if len(body.points) != 2:
         raise ValidationAppError("קו דורש בדיוק שתי נקודות")
 
-    line_id = body.id or f"line_{slugify(body.name)}"
+    line_id = body.id or id_from_name("line", body.name)
     if await db.get(Line, line_id) is not None:
         line_id = new_id("line")
 
@@ -70,6 +72,8 @@ async def create_line(
         name=body.name,
         points_json=body.points,
         direction=body.direction,
+        label_a_to_b=body.label_a_to_b,
+        label_b_to_a=body.label_b_to_a,
         enabled=body.enabled,
         created_at=datetime.now(UTC),
     )
@@ -109,6 +113,10 @@ async def update_line(
         line.points_json = body.points
     if body.direction is not None:
         line.direction = body.direction
+    if body.label_a_to_b is not None:
+        line.label_a_to_b = body.label_a_to_b or None
+    if body.label_b_to_a is not None:
+        line.label_b_to_a = body.label_b_to_a or None
     if body.enabled is not None:
         line.enabled = body.enabled
     await db.commit()

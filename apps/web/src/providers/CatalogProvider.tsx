@@ -13,6 +13,8 @@ import {
   useState,
 } from "react";
 import { api } from "@/lib/api";
+import { defaultDirectionLabel, type RuleNames } from "@/lib/rule-describe";
+import { isFullFrameZone } from "@/lib/rule-wizard/convert";
 import type { Camera, Line, Rule, Zone } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -30,6 +32,8 @@ type CatalogValue = {
   zonesForCamera: (cameraId: string) => Zone[];
   linesForCamera: (cameraId: string) => Line[];
   rulesForCamera: (cameraId: string) => Rule[];
+  /** Names bundle for describeRule / ruleSentence. */
+  ruleNames: RuleNames;
 };
 
 const CatalogContext = createContext<CatalogValue | null>(null);
@@ -83,7 +87,24 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     const camMap = new Map(cameras.map((c) => [c.id, c.name]));
     const zoneMap = new Map(zones.map((z) => [z.id, z.name]));
     const lineMap = new Map(lines.map((l) => [l.id, l.name]));
+    const lineById = new Map(lines.map((l) => [l.id, l]));
+    const zoneById = new Map(zones.map((z) => [z.id, z]));
     const ruleMap = new Map(rules.map((r) => [r.id, r.name]));
+    const cameraName = (id: string | null | undefined) => (id ? camMap.get(id) ?? "—" : "—");
+    const zoneName = (id: string | null | undefined) => (id ? zoneMap.get(id) ?? "—" : "—");
+    const lineName = (id: string | null | undefined) => (id ? lineMap.get(id) ?? "—" : "—");
+    const ruleNames: RuleNames = {
+      cameraName,
+      zoneName,
+      lineName,
+      isFullFrameZone: (id) => (id ? isFullFrameZone(zoneById.get(id)) : false),
+      directionLabel: (lineId, dir) => {
+        const ln = lineId ? lineById.get(lineId) : undefined;
+        if (dir === "a_to_b") return ln?.label_a_to_b || defaultDirectionLabel(dir);
+        if (dir === "b_to_a") return ln?.label_b_to_a || defaultDirectionLabel(dir);
+        return null;
+      },
+    };
     return {
       cameras,
       zones,
@@ -91,10 +112,11 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       rules,
       loading,
       refresh,
-      cameraName: (id) => (id ? camMap.get(id) ?? "—" : "—"),
-      zoneName: (id) => (id ? zoneMap.get(id) ?? "—" : "—"),
-      lineName: (id) => (id ? lineMap.get(id) ?? "—" : "—"),
+      cameraName,
+      zoneName,
+      lineName,
       ruleName: (id) => (id ? ruleMap.get(id) ?? "—" : "—"),
+      ruleNames,
       zonesForCamera: (cameraId) => zones.filter((z) => z.camera_id === cameraId),
       linesForCamera: (cameraId) => lines.filter((l) => l.camera_id === cameraId),
       rulesForCamera: (cameraId) => rules.filter((r) => r.conditions?.camera_id === cameraId),

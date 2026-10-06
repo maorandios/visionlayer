@@ -21,7 +21,7 @@ type StateFilter = "all" | "active" | "disabled";
 
 export default function RulesPage() {
   const { token } = useAuth();
-  const { cameras, cameraName, zoneName, lineName, refresh: refreshCatalog } = useCatalog();
+  const { cameras, ruleNames, refresh: refreshCatalog } = useCatalog();
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export default function RulesPage() {
             <li key={rule.id}>
               <RuleCard
                 rule={rule}
-                description={describeRule(rule, { cameraName, zoneName, lineName })}
+                description={describeRule(rule, ruleNames)}
                 actions={
                   <>
                     <Button variant="secondary" size="sm" onClick={() => toggle(rule)}>

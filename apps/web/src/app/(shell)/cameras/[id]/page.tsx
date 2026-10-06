@@ -42,7 +42,7 @@ function CameraWorkspaceInner() {
   const router = useRouter();
   const search = useSearchParams();
   const { token } = useAuth();
-  const { zoneName, lineName, cameraName, ruleName, refresh: refreshCatalog } = useCatalog();
+  const { zoneName, lineName, cameraName, ruleName, ruleNames, refresh: refreshCatalog } = useCatalog();
   const { events } = useEvents();
 
   const requestedTab = search.get("tab") as Tab | null;
@@ -275,7 +275,7 @@ function CameraWorkspaceInner() {
                 <li key={rule.id}>
                   <RuleCard
                     rule={rule}
-                    description={describeRule(rule, { cameraName, zoneName, lineName })}
+                    description={describeRule(rule, ruleNames)}
                     showCamera={false}
                     actions={
                       <>

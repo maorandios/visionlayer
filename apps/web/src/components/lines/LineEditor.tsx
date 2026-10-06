@@ -83,11 +83,11 @@ export function LineEditor({ points, onChange, backgroundImageUrl }: Props) {
             <>
               <circle cx={a[0] * W} cy={a[1] * H} r={5} fill="#171717" />
               <text x={a[0] * W + 10} y={a[1] * H - 8} fontSize={14} fill="#171717">
-                A
+                1
               </text>
               <circle cx={b[0] * W} cy={b[1] * H} r={5} fill="#171717" />
               <text x={b[0] * W + 10} y={b[1] * H - 8} fontSize={14} fill="#171717">
-                B
+                2
               </text>
             </>
           ) : null}

@@ -88,6 +88,10 @@ class Line(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     points_json: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
     direction: Mapped[str] = mapped_column(String(32), nullable=False, default="any")
+    # Human-readable names for the two sides of the line (e.g. "חוץ" / "פנים") so rules can say
+    # "בכיוון כניסה" instead of A→B. Optional; purely presentational.
+    label_a_to_b: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    label_b_to_a: Mapped[str | None] = mapped_column(String(100), nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

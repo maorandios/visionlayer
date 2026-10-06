@@ -120,6 +120,16 @@ def _cooldown_ok(rule: RuleSnapshot, now: datetime) -> bool:
     return elapsed >= rule.cooldown_seconds
 
 
+# One-shot spatial transitions are already unique per occurrence_id. A global
+# per-rule cooldown would drop sibling tracks that enter/exit/cross within the
+# same short window (common in Video Lab clips and busy scenes).
+_COOLDOWN_EXEMPT_TRIGGERS = frozenset({"zone_enter", "zone_exit", "line_cross"})
+
+
+def _cooldown_applies(trigger: str) -> bool:
+    return trigger not in _COOLDOWN_EXEMPT_TRIGGERS
+
+
 def _zone_label(ctx: DetectionContext, zone_id: str | None) -> str:
     if not zone_id:
         return "אזור"
@@ -148,7 +158,10 @@ def _base_gate(rule: RuleSnapshot, ctx: DetectionContext) -> bool:
         return False
     if not is_within_schedule(ctx.timestamp, conditions.get("schedule")):
         return False
-    return _cooldown_ok(rule, ctx.timestamp)
+    trigger = infer_trigger(conditions)
+    if _cooldown_applies(trigger) and not _cooldown_ok(rule, ctx.timestamp):
+        return False
+    return True
 
 
 def _match_zone_presence(rule: RuleSnapshot, ctx: DetectionContext) -> RuleMatch | None:
@@ -303,6 +316,7 @@ def aggregation_from_conditions(conditions: dict[str, Any]) -> dict[str, Any]:
             "window_seconds": raw.get("window_seconds"),
             "operator": raw.get("operator") or "gte",
             "threshold": raw.get("threshold"),
+            "count_on": raw.get("count_on"),
         }
     return {
         "metric": "unique_objects",
@@ -366,7 +380,9 @@ def _match_count_threshold(rule: RuleSnapshot, ctx: DetectionContext) -> RuleMat
     if rule.conditions.get("line_id"):
         message = f"{count} {obj} חצו את {_line_label(ctx, rule.conditions.get('line_id'))}{window_he}"
     elif rule.conditions.get("zone_id"):
-        message = f"{count} {obj} נכנסו לאזור {_zone_label(ctx, rule.conditions.get('zone_id'))}{window_he}"
+        count_on = (agg.get("count_on") if isinstance(agg, dict) else None) or None
+        verb = "יצאו מ" if count_on == "zone_exit" else "נכנסו ל"
+        message = f"{count} {obj} {verb}אזור {_zone_label(ctx, rule.conditions.get('zone_id'))}{window_he}"
 
     return RuleMatch(
         rule_id=rule.id,

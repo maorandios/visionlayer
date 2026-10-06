@@ -13,7 +13,7 @@ from app.adapters.models import Camera, Zone
 from app.api.schemas import ZoneCreate, ZoneResponse, ZoneUpdate
 from app.core.deps import CurrentUser, get_current_user
 from app.core.errors import NotFoundError, ValidationAppError
-from app.core.ids import new_id, slugify
+from app.core.ids import id_from_name, new_id
 
 router = APIRouter(tags=["zones"])
 
@@ -60,7 +60,7 @@ async def create_zone(
     if body.kind != "polygon":
         raise ValidationAppError("בשלב זה נתמך רק אזור מסוג polygon")
 
-    zone_id = body.id or f"zone_{slugify(body.name)}"
+    zone_id = body.id or id_from_name("zone", body.name)
     if await db.get(Zone, zone_id) is not None:
         zone_id = new_id("zone")
 

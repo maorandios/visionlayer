@@ -284,6 +284,65 @@ def test_rule_zone_enter_hebrew() -> None:
     assert match.spatial_event == "zone_enter"
 
 
+def test_zone_enter_ignores_global_cooldown_for_sibling_tracks() -> None:
+    """Regression: cooldown must not suppress other tracks' zone_enter events.
+
+    Video Lab job vjob_2e79da4426d6 had enter_count=7 but only 1 event because the
+    wizard default cooldown (30s) blocked every enter after the first.
+    """
+    rule = RuleSnapshot(
+        id="r_enter",
+        name="moto enter",
+        enabled=True,
+        conditions={
+            "object_classes": ["motorcycle"],
+            "camera_id": "cam",
+            "zone_id": "z1",
+            "trigger": "zone_enter",
+        },
+        actions=[{"type": "create_event"}],
+        cooldown_seconds=30,
+        last_triggered_at=_ts(1.0),
+    )
+    matches = []
+    for tid, t in [(4, 1.0), (5, 1.7), (6, 2.2)]:
+        ev = SpatialEvent(
+            kind="zone_enter",
+            camera_id="cam",
+            track_id=tid,
+            object_class="motorcycle",
+            confidence=0.56,
+            timestamp=_ts(t),
+            zone_id="z1",
+            occurrence_id=f"enter:cam:{tid}:z1:{_ts(t).isoformat()}",
+        )
+        m = evaluate_rule(
+            rule,
+            _ctx(
+                object_class="motorcycle",
+                track_id=tid,
+                timestamp=_ts(t),
+                spatial_events=(ev,),
+            ),
+        )
+        if m is not None:
+            matches.append(m)
+            # Pipeline updates last_triggered after each fire — simulate that.
+            rule = RuleSnapshot(
+                id=rule.id,
+                name=rule.name,
+                enabled=rule.enabled,
+                conditions=rule.conditions,
+                actions=rule.actions,
+                cooldown_seconds=rule.cooldown_seconds,
+                last_triggered_at=_ts(t),
+            )
+    assert len(matches) == 3
+    assert {m.dedupe_key for m in matches} == {
+        f"r_enter:enter:cam:{tid}:z1:{_ts(t).isoformat()}" for tid, t in [(4, 1.0), (5, 1.7), (6, 2.2)]
+    }
+
+
 def test_rule_line_cross_direction() -> None:
     ev = SpatialEvent(
         kind="line_cross",

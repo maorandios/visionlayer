@@ -77,6 +77,8 @@ class DetectionPipeline:
         valid = [d for d in detections if d.get("type") == "detection"]
         if not valid:
             return []
+        # Spatial enter/exit depends on chronological order; callers may not sort.
+        valid.sort(key=lambda d: (float(d.get("timestamp") or 0.0), int(d.get("track_id") or 0)))
 
         camera_id = str(valid[0]["camera_id"])
         metrics_ctx = MetricsContext(scope=metrics_scope, analysis_run_id=analysis_run_id)
@@ -252,10 +254,9 @@ class DetectionPipeline:
                                 relevant = True
                                 break
                         elif rule.conditions.get("zone_id"):
-                            if (
-                                ev.kind == "zone_enter"
-                                and ev.zone_id == rule.conditions.get("zone_id")
-                            ):
+                            agg = aggregation_from_conditions(rule.conditions)
+                            want_kind = "zone_exit" if agg.get("count_on") == "zone_exit" else "zone_enter"
+                            if ev.kind == want_kind and ev.zone_id == rule.conditions.get("zone_id"):
                                 relevant = True
                                 break
                     if not relevant:

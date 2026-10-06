@@ -20,7 +20,7 @@ from app.api.schemas import (
 )
 from app.core.deps import CurrentUser, get_current_user
 from app.core.errors import NotFoundError
-from app.core.ids import new_id, slugify
+from app.core.ids import id_from_name, new_id
 from app.domain.rules.engine import aggregation_from_conditions, infer_trigger
 
 router = APIRouter(prefix="/api/v1/rules", tags=["rules"])
@@ -135,7 +135,7 @@ async def create_rule(
 
         raise ValidationAppError("חוק לא תקין", details={"errors": errors})
 
-    rule_id = body.id or f"rule_{slugify(body.name)}"
+    rule_id = body.id or id_from_name("rule", body.name)
     if await db.get(Rule, rule_id) is not None:
         rule_id = new_id("rule")
 
