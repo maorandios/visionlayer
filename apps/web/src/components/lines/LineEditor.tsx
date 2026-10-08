@@ -37,13 +37,13 @@ export function LineEditor({ points, onChange, backgroundImageUrl }: Props) {
   return (
     <div className="space-y-3">
       <div
-        className="relative overflow-hidden rounded-2xl border border-border bg-muted"
+        className="relative overflow-hidden rounded-lg border border-border bg-muted"
         dir="ltr"
       >
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          className="aspect-video w-full touch-none bg-neutral-200"
+          className="aspect-video w-full touch-none bg-canvas"
           onPointerDown={(e) => {
             if (dragIndex !== null) return;
             handlePointer(e.clientX, e.clientY);
@@ -74,19 +74,19 @@ export function LineEditor({ points, onChange, backgroundImageUrl }: Props) {
               y1={a[1] * H}
               x2={b[0] * W}
               y2={b[1] * H}
-              stroke="#171717"
+              stroke="var(--color-accent)"
               strokeWidth={3}
               strokeLinecap="round"
             />
           ) : null}
           {a && b ? (
             <>
-              <circle cx={a[0] * W} cy={a[1] * H} r={5} fill="#171717" />
-              <text x={a[0] * W + 10} y={a[1] * H - 8} fontSize={14} fill="#171717">
+              <circle cx={a[0] * W} cy={a[1] * H} r={5} fill="var(--color-accent)" />
+              <text x={a[0] * W + 10} y={a[1] * H - 8} fontSize={14} fill="var(--color-accent)">
                 1
               </text>
-              <circle cx={b[0] * W} cy={b[1] * H} r={5} fill="#171717" />
-              <text x={b[0] * W + 10} y={b[1] * H - 8} fontSize={14} fill="#171717">
+              <circle cx={b[0] * W} cy={b[1] * H} r={5} fill="var(--color-accent)" />
+              <text x={b[0] * W + 10} y={b[1] * H - 8} fontSize={14} fill="var(--color-accent)">
                 2
               </text>
             </>
@@ -101,7 +101,7 @@ export function LineEditor({ points, onChange, backgroundImageUrl }: Props) {
                 cy={y}
                 r={8}
                 fill="#fff"
-                stroke="#171717"
+                stroke="var(--color-accent)"
                 strokeWidth={2}
                 onPointerDown={(e) => {
                   e.stopPropagation();

@@ -37,7 +37,7 @@ export default function EditCameraPage() {
     setError(null);
     try {
       await api.cameras.update(token, id, { name, location: location || null });
-      router.push(`/cameras/${id}`);
+      router.push(`/?camera=${id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("errorSave"));
     } finally {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Bell, CalendarClock, ChevronDown, FileVideo } from "lucide-react";
 import { useState } from "react";
@@ -137,7 +137,7 @@ function CountBlock() {
       </div>
 
       {state.countThresholdEnabled ? (
-        <div className="space-y-4 rounded-2xl border border-border bg-surface p-4">
+        <div className="space-y-4 rounded-lg border border-border bg-surface p-4">
           <p className="text-sm text-ink">
             צור אירוע כשיש <span className="font-semibold">לפחות {state.countThreshold || "—"} {plural}</span> בתוך{" "}
             <span className="font-semibold">{durationShort(state.countWindowSeconds || 0)}</span>.
@@ -260,7 +260,7 @@ export function StepConditions() {
       </div>
 
       {custom ? (
-        <div className="rounded-2xl border border-border bg-surface">
+        <div className="rounded-lg border border-border bg-surface">
           <button
             type="button"
             className="flex min-h-11 w-full items-center justify-between px-4 text-sm font-medium text-ink"

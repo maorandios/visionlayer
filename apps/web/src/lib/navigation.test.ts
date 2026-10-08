@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DESKTOP_NAV,
+  DRAWER_NAV,
   MOBILE_NAV,
   NAV_MORE,
   availableDevTools,
@@ -17,20 +17,19 @@ const devHub: HubInfo = {
 };
 
 describe("navigation model", () => {
-  it("mobile bottom nav has exactly 5 items in the product order", () => {
-    expect(MOBILE_NAV.map((i) => i.label)).toEqual(["בית", "אירועים", "מצלמות", "תובנות", "עוד"]);
+  it("mobile bottom nav has exactly 5 items in camera-first order", () => {
+    expect(MOBILE_NAV.map((i) => i.label)).toEqual(["מצלמות", "אירועים", "חוקים ואוטומציות", "תובנות", "עוד"]);
   });
 
-  it("desktop sidebar lists product areas, with no dev tools mixed in", () => {
-    expect(DESKTOP_NAV.map((i) => i.label)).toEqual([
-      "בית",
-      "אירועים",
+  it("drawer lists product areas, with no dev tools mixed in", () => {
+    expect(DRAWER_NAV.map((i) => i.label)).toEqual([
       "מצלמות",
+      "אירועים",
       "חוקים ואוטומציות",
       "תובנות",
       "הגדרות",
     ]);
-    expect(DESKTOP_NAV.some((i) => i.href.startsWith("/dev/"))).toBe(false);
+    expect(DRAWER_NAV.some((i) => i.href.startsWith("/dev/"))).toBe(false);
   });
 
   it("dev tools are hidden outside development or when feature flags are off", () => {
@@ -44,16 +43,16 @@ describe("navigation model", () => {
     expect(availableDevTools(devHub).map((d) => d.key)).toEqual(["video_lab", "simulate", "benchmarks"]);
   });
 
-  it("active state: home is exact, sections match sub-routes, 'more' covers secondary areas", () => {
-    const home = MOBILE_NAV[0];
-    expect(isNavActive(home, "/")).toBe(true);
-    expect(isNavActive(home, "/events")).toBe(false);
-    expect(isNavActive(MOBILE_NAV[2], "/cameras/cam_1")).toBe(true);
-    expect(isNavActive(MOBILE_NAV[2], "/camerasx")).toBe(false);
-    expect(isMoreActive("/rules/new")).toBe(true);
+  it("active state: cameras home covers / and /cameras, more covers settings + dev", () => {
+    const cameras = MOBILE_NAV[0];
+    expect(isNavActive(cameras, "/")).toBe(true);
+    expect(isNavActive(cameras, "/cameras")).toBe(true);
+    expect(isNavActive(cameras, "/cameras/cam_1")).toBe(true);
+    expect(isNavActive(cameras, "/events")).toBe(false);
+    expect(isNavActive(MOBILE_NAV[2], "/rules/new")).toBe(true);
     expect(isMoreActive("/settings")).toBe(true);
     expect(isMoreActive("/dev/video-lab")).toBe(true);
-    expect(isMoreActive("/insights")).toBe(false);
+    expect(isMoreActive("/rules")).toBe(false);
     expect(isNavActive(NAV_MORE, "/more")).toBe(true);
   });
 });

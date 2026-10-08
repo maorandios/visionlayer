@@ -1,46 +1,38 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { legacyCameraToOps, opsHref, parseOpsTab } from "@/components/operations/ops-url";
 
-describe("cameras UI", () => {
-  it("list page shows cards with counts, enable/disable, and create link", () => {
-    const src = readFileSync(resolve(__dirname, "page.tsx"), "utf8");
-    expect(src).toContain("api.cameras.list");
-    expect(src).toContain("api.cameras.enable");
-    expect(src).toContain("api.cameras.disable");
-    expect(src).toContain("/cameras/new");
-    expect(src).toContain("zonesForCamera");
-    expect(src).toContain("rulesForCamera");
-    expect(src).toContain("isVirtualCamera");
-    expect(src).toContain("devSourceBadge");
-    // destructive delete moved into the camera workspace settings tab
-    expect(src).not.toContain("api.cameras.delete");
-    expect(src).not.toContain("confirm(");
+describe("cameras / operations UI", () => {
+  it("ops URL helpers encode camera focus and tabs", () => {
+    expect(opsHref()).toBe("/");
+    expect(opsHref("cam_1")).toBe("/?camera=cam_1");
+    expect(opsHref("cam_1", "rules")).toBe("/?camera=cam_1&tab=rules");
+    expect(opsHref("cam_1", "overview")).toBe("/?camera=cam_1");
+    expect(parseOpsTab("zones")).toBe("overview");
+    expect(parseOpsTab("nope")).toBe("overview");
+    expect(legacyCameraToOps("cam_1", "events")).toBe("/?camera=cam_1&tab=events");
+    expect(legacyCameraToOps("cam_1", "settings")).toBe("/?camera=cam_1&tab=settings");
+    expect(parseOpsTab("settings")).toBe("settings");
   });
 
-  it("new camera page posts create", () => {
+  it("new camera page posts create and returns to ops focus", () => {
     const src = readFileSync(resolve(__dirname, "new/page.tsx"), "utf8");
     expect(src).toContain("api.cameras.create");
+    expect(src).toContain("/?camera=");
   });
 
-  it("camera workspace has the six product tabs and a confirm dialog for delete", () => {
+  it("legacy detail route redirects into the operations workspace", () => {
     const src = readFileSync(resolve(__dirname, "[id]/page.tsx"), "utf8");
-    for (const key of [
-      "cameraOverview",
-      "cameraZonesLines",
-      "cameraRules",
-      "cameraEvents",
-      "cameraMetrics",
-      "cameraSettings",
-    ]) {
-      expect(src).toContain(`t("${key}")`);
-    }
-    expect(src).toContain('search.get("tab")');
-    expect(src).toContain("api.cameras.delete");
-    expect(src).toContain("ConfirmDialog");
-    expect(src).not.toContain("confirm(");
-    expect(src).toContain("api.metrics.summary");
-    expect(src).toContain("RuleCard");
-    expect(src).toContain("EventCard");
+    expect(src).toContain("legacyCameraToOps");
+    expect(src).toContain("router.replace");
+  });
+
+  it("zones and lines editors return to the camera rules tab in ops", () => {
+    const zone = readFileSync(resolve(__dirname, "[id]/zones/new/page.tsx"), "utf8");
+    const line = readFileSync(resolve(__dirname, "[id]/lines/new/page.tsx"), "utf8");
+    expect(zone).toContain("/?camera=");
+    expect(zone).toContain("tab=rules");
+    expect(line).toContain("tab=rules");
   });
 });

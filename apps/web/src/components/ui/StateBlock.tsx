@@ -22,9 +22,9 @@ export function EmptyBlock({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center">
-      <p className="text-sm text-ink">{message}</p>
-      {hint ? <p className="mt-1 text-xs text-ink-muted">{hint}</p> : null}
+    <div className="rounded-lg border border-dashed border-border bg-surface/50 p-8 text-center">
+      <p className="text-sm font-medium text-ink">{message}</p>
+      {hint ? <p className="mt-1.5 text-xs text-ink-muted">{hint}</p> : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   );
@@ -32,7 +32,7 @@ export function EmptyBlock({
 
 export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6 text-center">
+    <div className="rounded-lg border border-danger/25 bg-danger-soft p-6 text-center">
       <p className="text-sm text-ink">{message}</p>
       {onRetry ? (
         <Button variant="secondary" className="mt-4" onClick={onRetry}>

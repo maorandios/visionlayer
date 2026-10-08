@@ -44,6 +44,17 @@ export function isVirtualCamera(camera: Pick<Camera, "id"> | string | null | und
   return typeof id === "string" && id.startsWith("vcam_");
 }
 
+function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
+
 export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   const [cameras, setCameras] = useState<Camera[]>([]);
@@ -71,9 +82,9 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         api.rules.list(token),
       ]);
       setCameras(cams);
-      setZones(zoneLists.flat());
-      setLines(lineLists.flat());
-      setRules(ruleList);
+      setZones(dedupeById(zoneLists.flat()));
+      setLines(dedupeById(lineLists.flat()));
+      setRules(dedupeById(ruleList));
     } finally {
       setLoading(false);
     }

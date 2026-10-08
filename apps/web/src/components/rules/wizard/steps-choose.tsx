@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   ArrowLeftRight,
@@ -87,15 +87,15 @@ export function StepCamera() {
                     lineId: state.cameraId === cam.id ? state.lineId : null,
                   })
                 }
-                className={`w-full overflow-hidden rounded-2xl border text-start transition ${
-                  selected ? "border-ink ring-2 ring-ink" : "border-border hover:border-ink/40"
+                className={`w-full overflow-hidden rounded-lg border text-start transition ${
+                  selected ? "border-accent ring-accent" : "border-border hover:border-border-strong"
                 } ${virtual ? "border-dashed" : ""}`}
               >
                 <CameraSnapshot cameraId={cam.id} rounded="rounded-none" className="border-0" />
                 <div className="space-y-1 bg-surface p-3">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-medium text-ink">{cam.name}</p>
-                    <Chip tone={cam.enabled ? "solid" : "outline"}>{cam.enabled ? "פעילה" : "כבויה"}</Chip>
+                    <Chip tone={cam.enabled ? "success" : "outline"}>{cam.enabled ? "פעילה" : "כבויה"}</Chip>
                     {virtual ? <Chip tone="dashed">וידאו לבדיקה</Chip> : null}
                   </div>
                   <p className="text-xs text-ink-muted">

@@ -1,17 +1,16 @@
 /**
- * Single source of truth for the product navigation.
+ * Single source of truth for product navigation.
  *
- * Mental model:
- *   בית · אירועים · מצלמות · חוקים ואוטומציות · תובנות · הגדרות
- *   + a clearly separated "כלי פיתוח" section (Video Lab, Simulation, Benchmark history)
+ * Camera-first mental model:
+ *   מצלמות (operations home) · אירועים · חוקים ואוטומציות · תובנות · הגדרות
+ *   + separated "כלי פיתוח" (Video Lab, Simulation, Benchmark history)
  *
- * Mobile bottom nav is limited to 5 items; secondary areas live under "עוד".
+ * Mobile bottom nav is limited to 5 items; Settings + Dev live under "עוד".
  */
 import {
   BarChart3,
   Camera,
   FlaskConical,
-  Home,
   Bell,
   History,
   type LucideIcon,
@@ -29,26 +28,22 @@ export type NavItem = {
   exact?: boolean;
 };
 
-export const NAV_HOME: NavItem = { href: "/", label: "בית", icon: Home, exact: true };
+/** Primary operations home — camera grid / focus workspace. */
+export const NAV_CAMERAS: NavItem = { href: "/", label: "מצלמות", icon: Camera, exact: true };
 export const NAV_EVENTS: NavItem = { href: "/events", label: "אירועים", icon: Bell };
-export const NAV_CAMERAS: NavItem = { href: "/cameras", label: "מצלמות", icon: Camera };
 export const NAV_RULES: NavItem = { href: "/rules", label: "חוקים ואוטומציות", icon: Workflow };
 export const NAV_INSIGHTS: NavItem = { href: "/insights", label: "תובנות", icon: BarChart3 };
 export const NAV_SETTINGS: NavItem = { href: "/settings", label: "הגדרות", icon: Settings };
 export const NAV_MORE: NavItem = { href: "/more", label: "עוד", icon: MoreHorizontal };
 
 /** Mobile bottom navigation — max 5 items. */
-export const MOBILE_NAV: NavItem[] = [NAV_HOME, NAV_EVENTS, NAV_CAMERAS, NAV_INSIGHTS, NAV_MORE];
+export const MOBILE_NAV: NavItem[] = [NAV_CAMERAS, NAV_EVENTS, NAV_RULES, NAV_INSIGHTS, NAV_MORE];
 
-/** Desktop sidebar — product areas. */
-export const DESKTOP_NAV: NavItem[] = [
-  NAV_HOME,
-  NAV_EVENTS,
-  NAV_CAMERAS,
-  NAV_RULES,
-  NAV_INSIGHTS,
-  NAV_SETTINGS,
-];
+/** Global drawer / desktop menu — product areas (no permanent sidebar). */
+export const DRAWER_NAV: NavItem[] = [NAV_CAMERAS, NAV_EVENTS, NAV_RULES, NAV_INSIGHTS, NAV_SETTINGS];
+
+/** @deprecated use DRAWER_NAV — kept as alias for transitional imports. */
+export const DESKTOP_NAV = DRAWER_NAV;
 
 export type DevTool = NavItem & { hint: string; key: "video_lab" | "simulate" | "benchmarks" };
 
@@ -92,16 +87,19 @@ export function availableDevTools(hub: HubInfo | null | undefined): DevTool[] {
 }
 
 export function isNavActive(item: NavItem, pathname: string): boolean {
-  if (item.exact) return pathname === item.href;
+  if (item.exact) {
+    // Cameras home also treats legacy /cameras paths as active.
+    if (item.href === "/") return pathname === "/" || pathname === "/cameras" || pathname.startsWith("/cameras/");
+    return pathname === item.href;
+  }
   const base = item.href.split("?")[0];
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
-/** The "more" tab on mobile is active for every secondary area it hosts. */
+/** The "more" tab on mobile is active for Settings + Dev (Rules is now a primary tab). */
 export function isMoreActive(pathname: string): boolean {
   return (
     isNavActive(NAV_MORE, pathname) ||
-    isNavActive(NAV_RULES, pathname) ||
     isNavActive(NAV_SETTINGS, pathname) ||
     pathname.startsWith("/dev/")
   );

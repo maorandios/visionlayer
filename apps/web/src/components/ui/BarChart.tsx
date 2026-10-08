@@ -3,8 +3,7 @@
 export type BarPoint = { label: string; value: number };
 
 /**
- * One clean bar chart (SVG, grayscale, no dependencies).
- * Designed for ≤ 31 points (hours of a day / days of a month).
+ * Compact bar chart for dark operational surfaces.
  */
 export function BarChart({
   points,
@@ -20,7 +19,7 @@ export function BarChart({
   if (points.length === 0 || points.every((p) => p.value === 0)) {
     return (
       <div
-        className="flex items-center justify-center rounded-xl border border-dashed border-border text-xs text-ink-muted"
+        className="flex items-center justify-center rounded-md border border-dashed border-border text-xs text-ink-muted"
         style={{ height }}
       >
         {emptyLabel}
@@ -51,7 +50,7 @@ export function BarChart({
                 width={w * 0.7}
                 height={Math.max(h, p.value > 0 ? 1 : 0)}
                 rx={1}
-                fill="#171717"
+                fill="var(--color-accent)"
                 opacity={0.85}
               >
                 <title>{`${p.label}: ${valueFormatter(p.value)}`}</title>
@@ -60,7 +59,7 @@ export function BarChart({
           );
         })}
       </svg>
-      <div className="mt-1 grid text-[10px] text-ink-muted" style={{ gridTemplateColumns: `repeat(${points.length}, 1fr)` }}>
+      <div className="mt-1 grid text-[10px] text-ink-faint" style={{ gridTemplateColumns: `repeat(${points.length}, 1fr)` }}>
         {points.map((p, i) => (
           <span key={`${p.label}-l-${i}`} className="truncate text-center">
             {i % labelEvery === 0 ? p.label : ""}

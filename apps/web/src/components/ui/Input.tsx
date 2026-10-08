@@ -6,7 +6,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   const { className = "", ...rest } = props;
   return (
     <input
-      className={`min-h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-ink ${className}`}
+      className={`min-h-10 w-full rounded-md border border-border bg-black/30 px-3 text-sm text-ink placeholder:text-ink-faint outline-none backdrop-blur-sm transition focus:border-accent focus:ring-1 focus:ring-accent/40 ${className}`}
       {...rest}
     />
   );

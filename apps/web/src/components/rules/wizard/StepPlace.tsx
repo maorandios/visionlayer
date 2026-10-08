@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -28,7 +28,9 @@ export function StepPlace() {
 function PlaceZone() {
   const { state, choose, zones } = useWizard();
   const [creating, setCreating] = useState(false);
-  const list = zones.filter((z) => z.camera_id === state.cameraId && z.enabled);
+  const list = zones
+    .filter((z) => z.camera_id === state.cameraId && z.enabled)
+    .filter((z, i, arr) => arr.findIndex((x) => x.id === z.id) === i);
   const question = state.action === "zone_exit" ? "מאיזה אזור?" : "באיזה אזור?";
 
   if (creating || list.length === 0) {
@@ -53,8 +55,8 @@ function PlaceZone() {
     <div className="space-y-4">
       <StepTitle title={question} hint="בחרו אזור קיים או סמנו אזור חדש על התמונה." />
       <ul className="grid gap-3 sm:grid-cols-2" data-testid="wizard-zone-list">
-        {list.map((z) => (
-          <li key={z.id}>
+        {list.map((z, i) => (
+          <li key={`${z.id}-${i}`}>
             <PlaceCard
               selected={state.zoneId === z.id}
               name={z.name}
@@ -144,7 +146,9 @@ export function InlineZoneCreator({
 function PlaceLine() {
   const { state, choose, lines } = useWizard();
   const [creating, setCreating] = useState(false);
-  const list = lines.filter((l) => l.camera_id === state.cameraId && l.enabled);
+  const list = lines
+    .filter((l) => l.camera_id === state.cameraId && l.enabled)
+    .filter((l, i, arr) => arr.findIndex((x) => x.id === l.id) === i);
 
   if (creating || list.length === 0) {
     return (
@@ -290,8 +294,8 @@ function PlaceCard({
       aria-pressed={selected}
       data-testid={testId}
       onClick={onClick}
-      className={`w-full overflow-hidden rounded-2xl border text-start transition ${
-        selected ? "border-ink ring-2 ring-ink" : "border-border hover:border-ink/40"
+      className={`w-full overflow-hidden rounded-lg border text-start transition ${
+        selected ? "border-accent ring-accent" : "border-border hover:border-border-strong"
       }`}
     >
       {preview}
@@ -308,7 +312,7 @@ function NewPlaceCard({ label, onClick, testId }: { label: string; onClick: () =
       type="button"
       onClick={onClick}
       data-testid={testId}
-      className="flex min-h-[7rem] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface text-sm font-medium text-ink transition hover:border-ink/50 hover:bg-muted/60 sm:h-full"
+      className="flex min-h-[7rem] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface text-sm font-medium text-ink transition hover:border-accent/50 hover:bg-muted/60 sm:h-full"
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
         <Plus className="h-5 w-5" strokeWidth={2} aria-hidden />

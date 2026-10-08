@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
@@ -21,7 +21,7 @@ export function StepReview({ errors }: { errors: string[] }) {
     <div className="space-y-5" data-testid="wizard-review">
       <StepTitle title={isEdit ? "בדקו את החוק" : "החוק מוכן"} hint="בדקו שהכול נכון, ואז שמרו." />
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+      <div className="overflow-hidden rounded-lg border border-border bg-surface">
         <CameraSnapshot
           cameraId={state.cameraId}
           zone={zone}
@@ -88,15 +88,18 @@ export function SuccessScreen({
   cameraId,
   onAnother,
   labHref,
+  onDone,
 }: {
   sentence: string;
   cameraId: string | null;
   onAnother: () => void;
   labHref: string | null;
+  /** When set (embedded panel), primary CTA calls this instead of navigating. */
+  onDone?: () => void;
 }) {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center gap-5 py-10 text-center" data-testid="wizard-success">
-      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-ink text-surface">
+      <span className="flex h-16 w-16 items-center justify-center rounded-md bg-accent text-ink-on-accent">
         <CheckCircle2 className="h-8 w-8" strokeWidth={1.75} aria-hidden />
       </span>
       <div className="space-y-2">
@@ -106,12 +109,14 @@ export function SuccessScreen({
         </p>
       </div>
       <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
-        {labHref ? (
+        {onDone ? (
+          <Button onClick={onDone}>חזור למצלמה</Button>
+        ) : labHref ? (
           <Link href={labHref} className="contents">
             <Button>חזור למעבדת הווידאו</Button>
           </Link>
         ) : (
-          <Link href={cameraId ? `/cameras/${cameraId}?tab=rules` : "/rules"} className="contents">
+          <Link href={cameraId ? `/?camera=${cameraId}&tab=rules` : "/rules"} className="contents">
             <Button>חזור למצלמה</Button>
           </Link>
         )}

@@ -33,13 +33,13 @@ export function PolygonEditor({ points, onChange, backgroundImageUrl }: Props) {
   return (
     <div className="space-y-3">
       <div
-        className="relative overflow-hidden rounded-2xl border border-border bg-muted"
+        className="relative overflow-hidden rounded-lg border border-border bg-muted"
         dir="ltr"
       >
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
-          className="aspect-video w-full touch-none bg-neutral-200"
+          className="aspect-video w-full touch-none bg-canvas"
           onPointerDown={(e) => {
             if (dragIndex !== null) return;
             handlePointer(e.clientX, e.clientY);
@@ -61,7 +61,7 @@ export function PolygonEditor({ points, onChange, backgroundImageUrl }: Props) {
             <path
               d={pointsToSvgPath(points, W, H)}
               fill="rgba(23,23,23,0.12)"
-              stroke="#171717"
+              stroke="var(--color-accent)"
               strokeWidth={2}
             />
           ) : null}
@@ -75,7 +75,7 @@ export function PolygonEditor({ points, onChange, backgroundImageUrl }: Props) {
                 cy={y}
                 r={8}
                 fill="#fff"
-                stroke="#171717"
+                stroke="var(--color-accent)"
                 strokeWidth={2}
                 onPointerDown={(e) => {
                   e.stopPropagation();

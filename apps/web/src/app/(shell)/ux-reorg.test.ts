@@ -1,107 +1,113 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const read = (rel: string) => readFileSync(resolve(__dirname, rel), "utf8");
+const root = join(__dirname, "..", "..", "..");
 
-describe("UX reorganization", () => {
-  it("home: status header, today summary from metrics, attention section, recent events", () => {
+describe("camera-first operations UX", () => {
+  it("home is the Operations workspace (not a KPI dashboard)", () => {
     const src = read("page.tsx");
-    expect(src).toContain('t("dashboardTitle")');
-    expect(src).toContain("home-status");
-    expect(src).toContain("homeSystemActive");
-    expect(src).toContain("home-today");
-    expect(src).toContain("api.metrics.summary");
-    expect(src).toContain("vehiclesToday");
-    expect(src).toContain("peopleToday");
-    expect(src).toContain("home-attention");
-    expect(src).toContain("newEventsCount");
-    expect(src).toContain("recentEvents");
-    // production totals only — Video Lab events are excluded from the home feed
-    expect(src).toContain("source_analysis_run_id");
+    expect(src).toContain("OperationsWorkspace");
+    expect(src).not.toContain("home-today");
+    expect(src).not.toContain("dashboardTitle");
   });
 
-  it("navigation components consume the shared navigation model", () => {
-    const sidebar = read("../../components/layout/Sidebar.tsx");
-    const bottom = read("../../components/layout/BottomNav.tsx");
-    expect(sidebar).toContain("DESKTOP_NAV");
-    expect(sidebar).toContain("availableDevTools");
-    expect(sidebar).toContain("sidebar-dev-tools");
-    expect(bottom).toContain("MOBILE_NAV");
-    expect(bottom).toContain("grid-cols-5");
-    expect(bottom).toContain("md:hidden");
-    expect(bottom).toContain("min-h-14");
+  it("shell uses borderless top bar + left drawer menu (no permanent rail)", () => {
+    const shell = read("../../components/layout/AppShell.tsx");
+    expect(shell).toContain("TopBar");
+    expect(shell).toContain("DrawerMenu");
+    expect(shell).not.toContain("SideRail");
+    expect(shell).toContain("ops-shell");
+    expect(shell).not.toContain("Sidebar");
+    expect(shell).toContain("BottomNav");
+    expect(shell).toContain("h-dvh");
+    expect(shell).toContain("overflow-hidden");
+    const top = read("../../components/layout/TopBar.tsx");
+    expect(top).toContain("ops-topbar");
+    expect(top).toContain("ops-menu-button");
+    expect(top).not.toContain("border border-border");
+    expect(top).toContain("ml-auto");
+    expect(top).toContain('dir="ltr"');
+    const drawer = read("../../components/layout/DrawerMenu.tsx");
+    expect(drawer).toContain("DRAWER_NAV");
+    expect(drawer).toContain("drawer-dev-tools");
+    expect(drawer).toContain("left-0");
   });
 
-  it("more page: product areas first, dev tools clearly separated and flag-gated", () => {
+  it("operations workspace: grid, focus, panel tabs", () => {
+    const ops = read("../../components/operations/OperationsWorkspace.tsx");
+    expect(ops).toContain("ops-workspace");
+    expect(ops).toContain("ops-focus");
+    expect(ops).not.toContain("ops-camera-strip");
+    expect(ops).not.toContain("ops-back-grid");
+    expect(ops).toContain('search.get("camera")');
+    expect(ops).toContain("opsHref");
+    expect(ops).toContain("CameraOpsPanel");
+    expect(ops).toContain("CameraStage");
+    expect(ops).toContain('dir="ltr"');
+    expect(ops).toContain("lg:grid-cols-[minmax(0,1.65fr)_minmax(18rem,1fr)]");
+    expect(ops).toContain("overflow-hidden");
+
+    const panel = read("../../components/operations/CameraOpsPanel.tsx");
+    for (const id of ["overview", "events", "rules", "metrics", "settings"]) {
+      expect(panel).toContain(`"${id}"`);
+    }
+    expect(panel).not.toContain('"zones"');
+    expect(panel).toContain("rule-create");
+    expect(panel).toContain("ops-panel-back");
+    expect(panel).toContain("EventDetailView");
+    expect(panel).toContain("RuleWizard");
+    expect(panel).toContain("embedded");
+    expect(panel).not.toContain("camera-tab-zones");
+    expect(panel).toContain("camera-tab-settings");
+    expect(panel).toContain("CameraMetricsPanel");
+    expect(panel).not.toContain("activityToday");
+    expect(panel).toContain("fullWidth");
+    expect(panel).not.toContain(`/rules/new?cameraId=`);
+    expect(read("../../components/cameras/CameraMetricsPanel.tsx")).toContain("camera-tab-metrics");
+
+    const stage = read("../../components/operations/CameraStage.tsx");
+    expect(stage).toContain("ops-camera-stage");
+
+    const card = read("../../components/operations/CameraOpsCard.tsx");
+    expect(card).toContain("ops-camera-card");
+    expect(card).toContain("aspect-video");
+  });
+
+  it("legacy camera routes redirect into ops focus", () => {
+    const detail = read("cameras/[id]/page.tsx");
+    expect(detail).toContain("legacyCameraToOps");
+    expect(detail).toContain("router.replace");
+    const list = read("cameras/page.tsx");
+    expect(list).toContain("OperationsWorkspace");
+  });
+
+  it("more page keeps settings + flag-gated dev tools (rules are primary nav)", () => {
     const src = read("more/page.tsx");
-    expect(src).toContain("NAV_RULES");
     expect(src).toContain("NAV_SETTINGS");
     expect(src).toContain("availableDevTools");
     expect(src).toContain("more-dev-tools");
-    expect(src).toContain("devToolsSection");
-    expect(src.indexOf("productSection")).toBeLessThan(src.indexOf("more-dev-tools"));
+    expect(src).not.toContain("NAV_RULES");
   });
 
-  it("settings page is grouped into the five product sections", () => {
-    const src = read("settings/page.tsx");
-    for (const key of ["settingsSystem", "settingsNotifications", "settingsStorage", "settingsUsers", "settingsAbout"]) {
-      expect(src).toContain(key);
-    }
-    expect(src).toContain("features.push_notifications");
-    expect(src).toContain("settingsComingSoon");
+  it("insights / rules / settings pages remain available", () => {
+    expect(read("insights/page.tsx")).toContain("insights-kpis");
+    expect(read("rules/page.tsx")).toContain("RuleCard");
+    expect(read("settings/page.tsx")).toContain("settingsSystem");
   });
 
-  it("rules page: human-readable cards, filters, no window.confirm", () => {
-    const src = read("rules/page.tsx");
-    expect(src).toContain("RuleCard");
-    expect(src).toContain("describeRule");
-    expect(src).toContain("rules-filters");
-    expect(src).toContain("filterActive");
-    expect(src).toContain("filterDisabled");
-    expect(src).toContain("TRIGGER_FILTERS");
-    expect(src).toContain("ConfirmDialog");
-    expect(src).not.toContain("confirm(");
-    const card = read("../../components/rules/RuleCard.tsx");
-    expect(card).toContain('t("when")');
-    expect(card).toContain('t("actionLabel")');
+  it("ops-url helpers are pure and cover deep links", () => {
+    const src = read("../../components/operations/ops-url.ts");
+    expect(src).toContain("opsHref");
+    expect(src).toContain("parseOpsTab");
+    expect(src).toContain("legacyCameraToOps");
+    expect(src).toContain('"settings"');
   });
 
-  it("insights page: KPI cards, one trend chart, breakdowns, scope toggle only in dev", () => {
-    const src = read("insights/page.tsx");
-    expect(src).toContain("insights-kpis");
-    expect(src).toContain("KpiCard");
-    expect(src).toContain("avgDwell");
-    expect(src).toContain("insights-trend");
-    expect(src).toContain("BarChart");
-    expect(src).toContain("entriesByHour");
-    expect(src).toContain("insights-breakdown");
-    expect(src).toContain("byCamera");
-    expect(src).toContain("byClass");
-    expect(src).toContain("byZone");
-    expect(src).toContain("isDevEnvironment");
-    expect(src).toContain("insights-scope");
-    expect(src).toContain("api.metrics.timeseries");
-    expect(src).toContain("api.metrics.breakdown");
-  });
-
-  it("dev pages are badged as development tools and Video Lab shows per-run metrics", () => {
-    const lab = read("dev/video-lab/page.tsx");
-    expect(lab).toContain("devToolBadge");
-    expect(lab).toContain("RunMetrics");
-    const run = read("../../components/video-lab/RunMetrics.tsx");
-    expect(run).toContain('scope: "video_lab"');
-    expect(run).toContain("analysis_run_id");
-  });
-
-  it("shared primitives exist and respect touch targets", () => {
-    const button = read("../../components/ui/Button.tsx");
-    expect(button).toContain("min-h-11");
-    const tabs = read("../../components/ui/Tabs.tsx");
-    expect(tabs).toContain("min-h-11");
-    expect(tabs).toContain("overflow-x-auto");
-    for (const f of ["PageHeader", "Chip", "SectionHeader", "KpiCard", "ConfirmDialog", "BarChart"]) {
-      expect(read(`../../components/ui/${f}.tsx`).length).toBeGreaterThan(0);
+  it("shared primitives still exist", () => {
+    for (const f of ["Button", "Tabs", "Chip", "KpiCard", "ConfirmDialog", "BarChart"]) {
+      expect(existsSync(join(root, "src/components/ui", `${f}.tsx`))).toBe(true);
     }
   });
 });

@@ -32,6 +32,17 @@ import type { Camera, Line, Rule, Zone } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useCatalog } from "@/providers/CatalogProvider";
 
+function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
+
 export type RuleWizardProps = {
   mode: "create" | "edit";
   ruleId?: string;
@@ -41,6 +52,12 @@ export type RuleWizardProps = {
   presetObjectClass?: string | null;
   /** Where to return when the wizard was opened from Video Lab. */
   labReturnHref?: string | null;
+  /** Render inside the ops panel (no full-page nav / compact chrome). */
+  embedded?: boolean;
+  /** Called instead of router navigation when exiting (embedded or override). */
+  onExit?: () => void;
+  /** After a successful save in embedded mode (success screen primary CTA). */
+  onSaved?: () => void;
 };
 
 const STEP_COMPONENT: Record<Exclude<StepId, "review">, () => React.JSX.Element> = {
@@ -56,7 +73,16 @@ const STEP_COMPONENT: Record<Exclude<StepId, "review">, () => React.JSX.Element>
   outcome: StepOutcome,
 };
 
-export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, labReturnHref }: RuleWizardProps) {
+export function RuleWizard({
+  mode,
+  ruleId,
+  presetCameraId,
+  presetObjectClass,
+  labReturnHref,
+  embedded = false,
+  onExit,
+  onSaved,
+}: RuleWizardProps) {
   const { token, hub } = useAuth();
   const router = useRouter();
   const { refresh: refreshCatalog } = useCatalog();
@@ -92,10 +118,10 @@ export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, la
           Promise.all(cams.map((c) => api.lines.listForCamera(token, c.id).catch(() => [] as Line[]))),
         ]);
         if (!active) return;
-        const allZones = zoneLists.flat();
+        const allZones = dedupeById(zoneLists.flat());
         setCameras(cams);
         setZones(allZones);
-        setLines(lineLists.flat());
+        setLines(dedupeById(lineLists.flat()));
         setRules(ruleList);
         if (rule) {
           const w = ruleToWizard(rule, { zones: allZones });
@@ -186,8 +212,8 @@ export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, la
     lines,
     rules,
     names,
-    addZone: (z) => setZones((prev) => [...prev, z]),
-    addLine: (l) => setLines((prev) => [...prev, l]),
+    addZone: (z) => setZones((prev) => (prev.some((x) => x.id === z.id) ? prev : [...prev, z])),
+    addLine: (l) => setLines((prev) => (prev.some((x) => x.id === l.id) ? prev : [...prev, l])),
     notifyAvailable,
     isEdit: mode === "edit",
   };
@@ -218,8 +244,12 @@ export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, la
     if (idx >= 0 && idx <= safeIndex) setStepIndex(idx);
   }
 
-  const exitHref = labReturnHref ?? (state.cameraId && mode === "create" ? `/cameras/${state.cameraId}?tab=rules` : "/rules");
+  const exitHref = labReturnHref ?? (state.cameraId && mode === "create" ? `/?camera=${state.cameraId}&tab=rules` : "/rules");
   function exit() {
+    if (onExit) {
+      onExit();
+      return;
+    }
     router.push(exitHref);
   }
   function requestExit() {
@@ -251,7 +281,7 @@ export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, la
             points: FULL_FRAME_POINTS,
             enabled: true,
           });
-          setZones((prev) => [...prev, ff as Zone]);
+          setZones((prev) => (prev.some((x) => x.id === ff!.id) ? prev : [...prev, ff as Zone]));
         }
         const ffId = ff.id;
         working = { ...state, zoneId: ffId };
@@ -305,20 +335,25 @@ export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, la
 
   return (
     <WizardContext.Provider value={ctx}>
-      <div className="flex min-h-dvh flex-col" data-testid="rule-wizard" data-step={step}>
+      <div
+        className={embedded ? "flex h-full min-h-0 flex-col" : "flex min-h-dvh flex-col"}
+        data-testid="rule-wizard"
+        data-step={step}
+        data-embedded={embedded ? "true" : undefined}
+      >
         {/* top bar */}
-        <header className="sticky top-0 z-20 border-b border-border bg-canvas/95 backdrop-blur">
-          <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-2 px-4">
+        <header className={`z-20 shrink-0 border-b border-border glass ${embedded ? "" : "sticky top-0"}`}>
+          <div className={`flex h-12 w-full items-center gap-2 ${embedded ? "px-1" : "mx-auto max-w-6xl px-4"}`}>
             <button
               type="button"
               onClick={requestExit}
               aria-label="יציאה"
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-ink-muted hover:bg-muted hover:text-ink"
+              className="flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:bg-muted hover:text-ink"
             >
               <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
             </button>
             <h1 className="text-base font-semibold text-ink">{title}</h1>
-            {!saved ? (
+            {!saved && !embedded ? (
               <ol className="ms-auto hidden items-center gap-1 md:flex" aria-label="התקדמות">
                 {visibleGroups.map((g, i) => {
                   const done = i < groupIndex;
@@ -330,14 +365,18 @@ export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, la
                         onClick={() => jumpToGroup(g.id)}
                         disabled={!done}
                         aria-current={current ? "step" : undefined}
-                        className={`inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs ${
-                          current ? "bg-ink text-surface" : done ? "text-ink hover:bg-muted" : "text-ink-muted"
+                        className={`inline-flex min-h-8 items-center gap-1 rounded-md px-2 text-xs ${
+                          current
+                            ? "bg-accent-soft text-accent"
+                            : done
+                              ? "text-ink hover:bg-muted"
+                              : "text-ink-faint"
                         } disabled:cursor-default`}
                       >
                         {done ? <Check className="h-3 w-3" strokeWidth={2.5} aria-hidden /> : null}
                         {g.label}
                       </button>
-                      {i < visibleGroups.length - 1 ? <span className="text-ink-muted/60">›</span> : null}
+                      {i < visibleGroups.length - 1 ? <span className="text-ink-faint">›</span> : null}
                     </li>
                   );
                 })}
@@ -345,16 +384,17 @@ export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, la
             ) : null}
           </div>
           {!saved ? (
-            <div className="md:hidden">
-              <div className="flex items-center justify-between px-4 pb-2 text-xs text-ink-muted">
+            <div className={embedded ? "" : "md:hidden"}>
+              <div className={`flex items-center justify-between pb-2 text-xs text-ink-muted ${embedded ? "px-1" : "px-4"}`}>
                 <span>
-                  שלב {groupIndex + 1} מתוך {visibleGroups.length} · <span className="text-ink">{visibleGroups[groupIndex]?.label}</span>
+                  שלב {groupIndex + 1} מתוך {visibleGroups.length} ·{" "}
+                  <span className="text-ink">{visibleGroups[groupIndex]?.label}</span>
                 </span>
                 {groupIndex + 1 < visibleGroups.length ? <span>הבא: {visibleGroups[groupIndex + 1].label}</span> : null}
               </div>
-              <div className="h-1 w-full bg-muted">
+              <div className="h-0.5 w-full bg-muted">
                 <div
-                  className="h-1 bg-ink transition-all"
+                  className="h-0.5 bg-accent transition-all"
                   style={{ width: `${((groupIndex + 1) / visibleGroups.length) * 100}%` }}
                 />
               </div>
@@ -364,39 +404,48 @@ export function RuleWizard({ mode, ruleId, presetCameraId, presetObjectClass, la
         </header>
 
         {/* body */}
-        <div className="mx-auto w-full max-w-6xl flex-1 px-4 pb-8 pt-5">
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto ${
+            embedded ? "px-1 pb-4 pt-3" : "mx-auto w-full max-w-6xl px-4 pb-8 pt-5"
+          }`}
+        >
           {saved ? (
             <SuccessScreen
               sentence={saved.sentence}
               cameraId={saved.cameraId}
               onAnother={startAnother}
               labHref={labReturnHref ?? null}
+              onDone={onSaved ?? onExit}
             />
           ) : (
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className={embedded ? "space-y-5" : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"}>
               <div className="min-w-0 space-y-5">
                 {isReview ? <StepReview errors={saveErrors} /> : StepBody ? <StepBody /> : null}
                 {error ? (
-                  <p className="rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink" role="alert" data-testid="wizard-step-error">
+                  <p className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink" role="alert" data-testid="wizard-step-error">
                     {error}
                   </p>
                 ) : null}
               </div>
-              {!isReview ? <RulePreviewPanel /> : null}
+              {!embedded && !isReview ? <RulePreviewPanel /> : null}
             </div>
           )}
         </div>
 
         {/* bottom actions */}
         {!saved ? (
-          <footer className="sticky bottom-0 z-20 border-t border-border bg-canvas/95 backdrop-blur">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <footer className={`z-20 shrink-0 border-t border-border glass ${embedded ? "" : "sticky bottom-0"}`}>
+            <div
+              className={`flex w-full items-center justify-between gap-3 py-3 ${
+                embedded ? "px-1" : "mx-auto max-w-6xl px-4"
+              }`}
+            >
               <Button variant="ghost" onClick={goBack}>
                 <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
                 {safeIndex === 0 ? "ביטול" : isReview ? "חזור לעריכה" : "חזרה"}
               </Button>
               {isReview ? (
-                <Button onClick={save} disabled={saving} data-testid="wizard-save">
+                <Button onClick={() => void save()} disabled={saving} data-testid="wizard-save">
                   {saving ? "שומר…" : mode === "edit" ? "שמור שינויים" : "שמור והפעל"}
                 </Button>
               ) : (

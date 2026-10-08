@@ -24,8 +24,8 @@ export function RulePreviewPanel() {
   const { sentence, lines } = usePreviewText();
   return (
     <aside className="hidden lg:block" data-testid="wizard-preview-panel">
-      <div className="sticky top-6 space-y-4 rounded-2xl border border-border bg-surface p-5">
-        <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+      <div className="glass sticky top-6 space-y-4 rounded-lg border border-border p-5 shadow-float">
+        <div className="flex items-center gap-2 text-xs font-medium text-accent">
           <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />
           כך ייראה החוק
         </div>

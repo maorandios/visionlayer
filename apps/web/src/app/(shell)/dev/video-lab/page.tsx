@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -160,7 +160,7 @@ function TrackCard({
   }
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-border bg-surface text-start">
+    <article className="overflow-hidden rounded-lg border border-border bg-surface text-start">
       <div className="relative aspect-video bg-ink" dir="ltr">
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -196,7 +196,7 @@ function TrackCard({
               disabled={saving}
               onClick={() => void setStatus(key)}
               className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                status === key ? "border-ink bg-ink text-white" : "border-border text-ink-muted"
+                status === key ? "border-accent bg-accent-soft text-accent" : "border-border text-ink-muted"
               }`}
             >
               {label}
@@ -591,7 +591,7 @@ function VideoLabInner() {
             key={step.label}
             className={`rounded-xl border px-3 py-2 ${
               step.active
-                ? "border-ink bg-surface text-ink"
+                ? "border-accent bg-accent-soft text-accent"
                 : "border-border bg-muted/40 text-ink-muted"
             }`}
           >
@@ -636,8 +636,8 @@ function VideoLabInner() {
               key={a.id}
               type="button"
               onClick={() => selectAsset(a.id)}
-              className={`rounded-2xl border p-3 text-start ${
-                selectedId === a.id ? "border-ink bg-surface" : "border-border bg-surface"
+              className={`rounded-lg border p-3 text-start ${
+                selectedId === a.id ? "border-accent bg-accent-soft" : "border-border bg-surface"
               }`}
             >
               <p className="font-medium text-ink">{a.name_he}</p>
@@ -653,7 +653,7 @@ function VideoLabInner() {
         <Card className="space-y-4">
           <h2 className="text-sm font-medium text-ink">{t("stepSetup")} · {selected.name_he}</h2>
 
-          <div className="rounded-2xl border border-border bg-muted/30 p-3 space-y-2">
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="font-medium text-ink">{t("analysisProgress")}</span>
               <span className="text-ink-muted">
@@ -693,7 +693,7 @@ function VideoLabInner() {
             </Button>
           </div>
 
-          <div className="space-y-2 rounded-2xl border border-dashed border-border bg-muted/20 p-3">
+          <div className="space-y-2 rounded-lg border border-dashed border-border bg-muted/20 p-3">
             <h3 className="text-sm font-medium text-ink">{t("activeRulesForCam")}</h3>
             {cameraZones.length === 0 ? (
               <p className="text-sm text-ink-muted">{t("noZonesForCam")}</p>
@@ -800,7 +800,7 @@ function VideoLabInner() {
                       onClick={() => void openHistoryRun(run.id)}
                       className={`w-full rounded-xl border px-3 py-2 text-start text-sm ${
                         benchmark?.id === run.id
-                          ? "border-ink bg-surface"
+                          ? "border-accent bg-accent-soft"
                           : "border-border bg-muted/20 text-ink-muted"
                       }`}
                     >
@@ -944,7 +944,7 @@ function VideoLabInner() {
                     type="button"
                     onClick={() => setGalleryFilter(f.key)}
                     className={`rounded-full border px-3 py-1 text-xs ${
-                      active ? "border-ink bg-ink text-white" : "border-border bg-surface text-ink-muted"
+                      active ? "border-accent bg-accent-soft text-accent" : "border-border bg-surface text-ink-muted"
                     }`}
                   >
                     {f.label} ({count})
@@ -960,7 +960,7 @@ function VideoLabInner() {
                   onClick={() => setReviewFilter(f.key)}
                   className={`rounded-full border px-3 py-1 text-xs ${
                     reviewFilter === f.key
-                      ? "border-ink bg-ink text-white"
+                      ? "border-accent bg-accent-soft text-accent"
                       : "border-border bg-surface text-ink-muted"
                   }`}
                 >
@@ -1018,7 +1018,7 @@ function VideoLabInner() {
               ) : (
                 <ul className="space-y-2">
                   {matchedRules.map((check) => (
-                    <li key={check.rule_id} className="rounded-xl border border-ink bg-surface px-3 py-2 text-sm">
+                    <li key={check.rule_id} className="rounded-xl border border-accent bg-accent-soft px-3 py-2 text-sm">
                       <p className="font-medium text-ink">{check.rule_name}</p>
                       <p className="mt-1 text-xs text-ink-muted">{check.reason_he}</p>
                     </li>

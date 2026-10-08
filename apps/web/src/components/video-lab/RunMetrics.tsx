@@ -99,7 +99,7 @@ export function RunMetrics({ runId, cameraId, lineName, zoneName }: Props) {
           <p className="mb-1 text-xs font-medium text-ink">{t("occupancyPeak")}</p>
           <ul className="space-y-1 text-xs text-ink-muted">
             {summary.occupancy.map((o) => (
-              <li key={o.zone_id} className="flex justify-between">
+              <li key={`${o.zone_id}-${o.current}-${o.peak}`} className="flex justify-between">
                 <span>{zoneName(o.zone_id)}</span>
                 <span className="text-ink">{o.peak}</span>
               </li>

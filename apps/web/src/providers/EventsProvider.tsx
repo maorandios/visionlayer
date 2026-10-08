@@ -27,6 +27,30 @@ type EventsContextValue = {
 
 const EventsContext = createContext<EventsContextValue | null>(null);
 
+function closeSocketQuietly(ws: WebSocket) {
+  ws.onopen = null;
+  ws.onmessage = null;
+  ws.onerror = null;
+  ws.onclose = null;
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.close();
+    return;
+  }
+  if (ws.readyState === WebSocket.CONNECTING) {
+    // Avoid "closed before the connection is established" console noise:
+    // close only after the handshake finishes (or fails).
+    const finish = () => {
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
+    };
+    ws.addEventListener("open", finish, { once: true });
+    ws.addEventListener("error", finish, { once: true });
+  }
+}
+
 export function EventsProvider({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   const { showToast } = useToast();
@@ -36,6 +60,8 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
   const backoffRef = useRef(1000);
   const mountedRef = useRef(true);
+  const showToastRef = useRef(showToast);
+  const prependRef = useRef<(event: EventItem) => void>(() => undefined);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -60,7 +86,15 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (token) refresh();
+    showToastRef.current = showToast;
+  }, [showToast]);
+
+  useEffect(() => {
+    prependRef.current = prependEvent;
+  }, [prependEvent]);
+
+  useEffect(() => {
+    if (token) void refresh();
   }, [token, refresh]);
 
   useEffect(() => {
@@ -82,8 +116,8 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
         try {
           const msg = JSON.parse(ev.data) as WsMessage;
           if (msg.type === "event.created" && msg.event) {
-            prependEvent(msg.event);
-            showToast(`${t("toastNewEvent")}: ${msg.event.message_he ?? ""}`);
+            prependRef.current(msg.event);
+            showToastRef.current(`${t("toastNewEvent")}: ${msg.event.message_he ?? ""}`);
           }
         } catch {
           /* ignore malformed */
@@ -103,10 +137,11 @@ export function EventsProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mountedRef.current = false;
       if (timer) window.clearTimeout(timer);
-      wsRef.current?.close();
+      const ws = wsRef.current;
       wsRef.current = null;
+      if (ws) closeSocketQuietly(ws);
     };
-  }, [token, prependEvent, showToast]);
+  }, [token]);
 
   const value = useMemo(
     () => ({ events, loading, error, refresh, prependEvent, patchEvent }),

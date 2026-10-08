@@ -10,7 +10,6 @@ type Props = {
   icon?: LucideIcon;
   selected?: boolean;
   disabled?: boolean;
-  /** Small note shown instead of the description when the choice is not available. */
   unavailableNote?: string;
   onClick?: () => void;
   size?: "md" | "lg";
@@ -18,7 +17,7 @@ type Props = {
   testId?: string;
 };
 
-/** Large touch-friendly selectable card. One decision per step, no form controls. */
+/** Selectable decision card — accent selected state, restrained radius. */
 export function ChoiceCard({
   title,
   description,
@@ -31,7 +30,7 @@ export function ChoiceCard({
   children,
   testId,
 }: Props) {
-  const pad = size === "lg" ? "p-5 md:p-6" : "p-4";
+  const pad = size === "lg" ? "p-4 md:p-5" : "p-3.5";
   return (
     <button
       type="button"
@@ -39,16 +38,16 @@ export function ChoiceCard({
       disabled={disabled}
       aria-pressed={selected}
       data-testid={testId}
-      className={`group relative flex w-full items-start gap-3 rounded-2xl border text-start transition ${pad} ${
+      className={`group relative flex w-full items-start gap-3 rounded-lg border text-start transition ${pad} ${
         selected
-          ? "border-ink bg-ink text-surface shadow-sm"
-          : "border-border bg-surface text-ink hover:border-ink/40 hover:bg-muted/60"
+          ? "border-accent bg-accent-soft text-ink shadow-soft"
+          : "border-border bg-black/25 text-ink backdrop-blur-sm hover:border-white/20 hover:bg-white/5"
       } disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {Icon ? (
         <span
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-            selected ? "bg-surface/15 text-surface" : "bg-muted text-ink"
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${
+            selected ? "bg-accent/20 text-accent" : "bg-muted text-ink-muted"
           }`}
         >
           <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
@@ -57,19 +56,19 @@ export function ChoiceCard({
       <span className="min-w-0 flex-1">
         <span className={`block font-medium ${size === "lg" ? "text-base" : "text-sm"}`}>{title}</span>
         {unavailableNote ? (
-          <span className={`mt-0.5 block text-xs ${selected ? "text-surface/80" : "text-ink-muted"}`}>
+          <span className={`mt-0.5 block text-xs ${selected ? "text-ink-muted" : "text-ink-faint"}`}>
             {unavailableNote}
           </span>
         ) : description ? (
-          <span className={`mt-0.5 block text-xs leading-relaxed ${selected ? "text-surface/80" : "text-ink-muted"}`}>
+          <span className={`mt-0.5 block text-xs leading-relaxed ${selected ? "text-ink-muted" : "text-ink-faint"}`}>
             {description}
           </span>
         ) : null}
         {children}
       </span>
       {selected ? (
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-ink">
-          <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-accent text-ink-on-accent">
+          <Check className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
         </span>
       ) : null}
     </button>
@@ -94,8 +93,10 @@ export function ChoicePill({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selected}
-      className={`inline-flex min-h-11 items-center justify-center rounded-xl border px-4 text-sm font-medium transition ${
-        selected ? "border-ink bg-ink text-surface" : "border-border bg-surface text-ink hover:bg-muted"
+      className={`inline-flex min-h-10 items-center justify-center rounded-md border px-3.5 text-sm font-medium transition ${
+        selected
+          ? "border-accent bg-accent-soft text-accent"
+          : "border-border bg-surface text-ink hover:bg-muted"
       } disabled:opacity-50`}
     >
       {label}

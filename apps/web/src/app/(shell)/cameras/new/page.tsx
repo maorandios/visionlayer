@@ -30,7 +30,7 @@ export default function NewCameraPage() {
         enabled: true,
       });
       await refresh();
-      router.push(`/cameras/${cam.id}`);
+      router.push(`/?camera=${cam.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("errorSave"));
     } finally {

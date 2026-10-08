@@ -32,7 +32,7 @@ export function RuleCard({
         <Link href={`/rules/${rule.id}`} className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-ink">{rule.name}</p>
         </Link>
-        <Chip tone={rule.enabled ? "solid" : "outline"}>{rule.enabled ? t("enabled") : t("disabled")}</Chip>
+        <Chip tone={rule.enabled ? "success" : "outline"}>{rule.enabled ? t("enabled") : t("disabled")}</Chip>
       </div>
       <dl className="mt-3 space-y-1.5 text-sm">
         <div className="flex gap-2">

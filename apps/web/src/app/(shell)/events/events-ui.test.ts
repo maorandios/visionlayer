@@ -4,10 +4,16 @@ import { describe, expect, it } from "vitest";
 
 describe("event media UI", () => {
   it("event detail shows snapshot and optional clip", () => {
-    const detail = readFileSync(resolve(__dirname, "[id]/page.tsx"), "utf8");
+    const page = readFileSync(resolve(__dirname, "[id]/page.tsx"), "utf8");
+    const detail = readFileSync(resolve(__dirname, "../../../components/events/EventDetailView.tsx"), "utf8");
+    expect(page).toContain("EventDetailView");
     expect(detail).toContain("snapshotBlob");
-    expect(detail).toContain("showEventClip");
+    expect(detail).toContain("clipBlob");
+    expect(detail).toContain("poster=");
+    expect(detail).toContain("event-clip-player");
     expect(detail).toContain("eventMediaUnavailable");
+    expect(detail).not.toContain("showEventClip");
+    expect(detail).not.toContain("acknowledge");
   });
 
   it("events feed uses the media-first EventCard (which renders EventThumbnail)", () => {
@@ -18,19 +24,22 @@ describe("event media UI", () => {
     expect(card).toContain("has_snapshot");
   });
 
-  it("dashboard recent events use media-first cards", () => {
-    const dash = readFileSync(resolve(__dirname, "../page.tsx"), "utf8");
-    expect(dash).toContain("EventCard");
+  it("camera operations panel shows recent events with media-first cards", () => {
+    const panel = readFileSync(resolve(__dirname, "../../../components/operations/CameraOpsPanel.tsx"), "utf8");
+    expect(panel).toContain("EventCard");
+    expect(panel).toContain("recentEvents");
+    expect(panel).toContain("onSelect");
+    expect(panel).toContain("ops-panel-back");
   });
 
   it("event detail is media-first with collapsed technical details", () => {
-    const detail = readFileSync(resolve(__dirname, "[id]/page.tsx"), "utf8");
+    const detail = readFileSync(resolve(__dirname, "../../../components/events/EventDetailView.tsx"), "utf8");
     // hero image comes before the info card
     expect(detail.indexOf("snapshotLargeUrl ?")).toBeLessThan(detail.indexOf('t("eventWhere")'));
     expect(detail).toContain("<details");
     expect(detail).toContain("technicalDetails");
     expect(detail).toContain("devSourceBadge");
-    expect(detail).toContain('t("acknowledge")');
+    expect(detail).not.toContain('t("acknowledge")');
   });
 
   it("events list offers state filters without technical jargon", () => {

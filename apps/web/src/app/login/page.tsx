@@ -33,17 +33,17 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-8">
+    <main className="ops-ambient mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-8">
       <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink text-surface">
+        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-accent/15 text-accent">
           <Layers className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h1 className="text-xl font-semibold text-ink">{t("loginTitle")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-ink">{t("loginTitle")}</h1>
           <p className="text-sm text-ink-muted">{t("loginSubtitle")}</p>
         </div>
       </div>
-      <Card>
+      <Card className="glass border-border shadow-float">
         <form className="space-y-4" onSubmit={onSubmit}>
           <div>
             <label className="mb-1 block text-xs text-ink-muted">{t("username")}</label>
@@ -64,7 +64,7 @@ export default function LoginPage() {
               autoComplete="current-password"
             />
           </div>
-          {error ? <p className="text-sm text-ink">{error}</p> : null}
+          {error ? <p className="text-sm text-danger">{error}</p> : null}
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? t("loggingIn") : t("login")}
           </Button>

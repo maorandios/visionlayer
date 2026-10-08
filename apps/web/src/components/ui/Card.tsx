@@ -12,7 +12,7 @@ export function Card({
   return (
     <div
       id={id}
-      className={`rounded-2xl border border-border bg-surface p-4 ${className}`}
+      className={`glass rounded-lg p-4 ${className}`}
     >
       {children}
     </div>

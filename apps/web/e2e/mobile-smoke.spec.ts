@@ -77,17 +77,18 @@ test.describe("mobile smoke", () => {
     await expect(page.getByRole("heading", { name: "התחברות" })).toBeVisible();
   });
 
-  test("mocked login reaches dashboard", async ({ page }) => {
+  test("mocked login reaches camera operations workspace", async ({ page }) => {
     await mockApi(page);
     await page.goto("/login");
     await page.getByLabel("שם משתמש").fill("admin");
     await page.getByLabel("סיסמה").fill("admin123");
     await page.getByRole("button", { name: "התחבר" }).click();
     await page.waitForURL("/", { timeout: 15000 });
-    await expect(page.getByRole("heading", { name: "בית" })).toBeVisible();
+    await expect(page.getByTestId("ops-empty").or(page.getByTestId("ops-workspace"))).toBeVisible();
+    await expect(page.getByTestId("ops-topbar")).toBeVisible();
   });
 
-  test("bottom nav has 5 items, all inside the viewport, with ≥44px touch targets", async ({ page }) => {
+  test("bottom nav has 5 camera-first items with ≥44px touch targets", async ({ page }) => {
     await mockApi(page);
     await page.goto("/login");
     await page.getByLabel("שם משתמש").fill("admin");
@@ -99,7 +100,7 @@ test.describe("mobile smoke", () => {
     await expect(nav).toBeVisible();
     const links = nav.getByRole("link");
     await expect(links).toHaveCount(5);
-    await expect(links).toHaveText(["בית", "אירועים", "מצלמות", "תובנות", "עוד"]);
+    await expect(links).toHaveText(["מצלמות", "אירועים", "חוקים ואוטומציות", "תובנות", "עוד"]);
 
     const viewport = page.viewportSize();
     expect(viewport).not.toBeNull();
@@ -110,24 +111,24 @@ test.describe("mobile smoke", () => {
       expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width + 1);
       expect(box!.height).toBeGreaterThanOrEqual(44);
     }
-
-    // Desktop sidebar must not render on mobile
-    await expect(page.getByRole("navigation", { name: "ניווט ראשי" })).toBeHidden();
   });
 
-  test("more page separates dev tools from product areas", async ({ page }) => {
+  test("more page and drawer expose settings and separated dev tools", async ({ page }) => {
     await mockApi(page);
     await page.goto("/login");
     await page.getByLabel("שם משתמש").fill("admin");
     await page.getByLabel("סיסמה").fill("admin123");
     await page.getByRole("button", { name: "התחבר" }).click();
     await page.waitForURL("/", { timeout: 15000 });
-    await expect(page.getByRole("heading", { name: "בית" })).toBeVisible();
-    // Direct navigation: in dev mode the Next.js devtools bubble overlaps the leftmost (RTL) tab.
+
+    await page.getByTestId("ops-menu-button").click();
+    await expect(page.getByTestId("ops-drawer")).toBeVisible();
+    await expect(page.getByTestId("drawer-dev-tools")).toBeVisible();
+    await page.getByRole("button", { name: "סגור" }).first().click();
+
     await page.goto("/more");
     await expect(page.getByRole("heading", { name: "עוד" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /חוקים ואוטומציות/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /הגדרות/ })).toBeVisible();
     await expect(page.getByTestId("more-dev-tools")).toBeVisible();
-    await expect(page.getByTestId("more-dev-tools").getByRole("link", { name: /מעבדת וידאו/ })).toBeVisible();
   });
 });

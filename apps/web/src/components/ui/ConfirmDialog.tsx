@@ -14,7 +14,7 @@ type Props = {
   busy?: boolean;
 };
 
-/** Minimal modal confirm (replaces window.confirm) — bottom sheet on mobile, centered on desktop. */
+/** Modal confirm — glass surface, restrained radius. */
 export function ConfirmDialog({
   open,
   title,
@@ -36,7 +36,7 @@ export function ConfirmDialog({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 md:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-canvas/70 p-3 backdrop-blur-sm md:items-center"
       role="presentation"
       onClick={onCancel}
     >
@@ -44,7 +44,7 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
-        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-lg"
+        className="glass-strong w-full max-w-sm rounded-xl p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="confirm-title" className="text-base font-semibold text-ink">
