@@ -161,9 +161,15 @@ export type MetricsSummary = {
     updated_at: string | null;
   }[];
   peak_occupancy: number;
-  by_class: { object_class: string; unique_objects: number; zone_entries: number; line_crossings: number }[];
-  vehicles: { unique_objects: number; zone_entries: number; line_crossings: number };
-  persons: { unique_objects: number; zone_entries: number; line_crossings: number };
+  by_class: {
+    object_class: string;
+    unique_objects: number;
+    zone_entries: number;
+    zone_exits?: number;
+    line_crossings: number;
+  }[];
+  vehicles: { unique_objects: number; zone_entries: number; zone_exits?: number; line_crossings: number };
+  persons: { unique_objects: number; zone_entries: number; zone_exits?: number; line_crossings: number };
 };
 
 export type MetricsTimeseries = {

@@ -13,6 +13,7 @@ import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock
 import { t } from "@/i18n/he";
 import { api } from "@/lib/api";
 import { isDevEnvironment } from "@/lib/navigation";
+import { applyRuleEnabled } from "@/lib/rules-list-state";
 import type { Camera, Rule } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { isVirtualCamera, useCatalog } from "@/providers/CatalogProvider";
@@ -22,7 +23,7 @@ function OperationsInner() {
   const router = useRouter();
   const search = useSearchParams();
   const { token, hub } = useAuth();
-  const { rulesForCamera, refresh: refreshCatalog } = useCatalog();
+  const { rulesForCamera, zonesForCamera, linesForCamera, refresh: refreshCatalog } = useCatalog();
   const { events } = useEvents();
 
   const cameraId = search.get("camera");
@@ -66,7 +67,7 @@ function OperationsInner() {
     }
   }, [loading, cameraId, cameras.length, selected, router]);
 
-  const setFocus = (id: string | null, nextTab: OpsTab = "overview") => {
+  const setFocus = (id: string | null, nextTab: OpsTab = "activity") => {
     router.replace(opsHref(id, nextTab), { scroll: false });
   };
 
@@ -74,11 +75,37 @@ function OperationsInner() {
     if (cameraId) router.replace(opsHref(cameraId, next), { scroll: false });
   };
 
-  async function toggleRule(rule: Rule) {
-    if (!token) return;
-    await api.rules.update(token, rule.id, { enabled: !rule.enabled });
-    await Promise.all([load(), refreshCatalog()]);
-  }
+  /**
+   * Toggle a single Rule by id — optimistic local patch, then PATCH /rules/{id}.
+   * Never bulk-assigns `enabled` across the camera's Rules list.
+   * Rollback flips only the failed Rule id (siblings stay as-is).
+   */
+  const toggleRule = useCallback(
+    async (ruleId: string, enabled: boolean) => {
+      if (!token) return;
+      if (!ruleId) return;
+      setRules((curr) => applyRuleEnabled(curr, ruleId, enabled));
+      try {
+        const updated = await api.rules.update(token, ruleId, { enabled });
+        // Reconcile ONLY the patched id — never map enabled onto siblings.
+        setRules((curr) =>
+          curr.map((r) => {
+            if (r.id !== ruleId) return r;
+            return {
+              ...r,
+              enabled: Boolean(updated.enabled),
+              updated_at: updated.updated_at ?? r.updated_at,
+            };
+          }),
+        );
+        void refreshCatalog();
+      } catch (e) {
+        setRules((curr) => applyRuleEnabled(curr, ruleId, !enabled));
+        throw e;
+      }
+    },
+    [token, refreshCatalog],
+  );
 
   const real = cameras.filter((c) => !isVirtualCamera(c));
   const virtual = cameras.filter((c) => isVirtualCamera(c));
@@ -112,6 +139,8 @@ function OperationsInner() {
           >
             <CameraOpsPanel
               camera={selected}
+              zones={zonesForCamera(selected.id)}
+              lines={linesForCamera(selected.id)}
               rules={rules}
               tab={tab}
               onTabChange={setTab}

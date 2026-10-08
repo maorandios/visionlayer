@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { describeRule, ruleSentence, triggerKind } from "@/lib/rule-describe";
+import {
+  describeRule,
+  isGenericRuleName,
+  ruleContextLine,
+  ruleDisplayName,
+  ruleFrequencyLabel,
+  ruleIconKey,
+  ruleListSentence,
+  ruleObjectLine,
+  ruleSentence,
+  sortRulesOperational,
+  triggerKind,
+} from "@/lib/rule-describe";
 import type { Rule } from "@/lib/types";
 
 const names = {
@@ -146,5 +158,86 @@ describe("describeRule", () => {
     for (const token of ["line_cross", "b_to_a", "zone_id", "object_classes"]) {
       expect(`${d.when} ${d.where} ${d.action}`).not.toContain(token);
     }
+  });
+});
+
+describe("operational Rules list helpers", () => {
+  it("builds compact context without schema tokens", () => {
+    const line = ruleContextLine(
+      rule({ trigger: "line_cross", line_id: "l_1", direction: "a_to_b", object_classes: ["car", "truck", "bus", "motorcycle"] }),
+      names,
+    );
+    expect(line).toBe("רכב · כניסה · שער A");
+    expect(line).not.toMatch(/a_to_b|line_cross|trigger|operator|aggregation/);
+
+    const dwell = ruleContextLine(
+      rule({
+        trigger: "dwell",
+        zone_id: "z_1",
+        min_duration_seconds: 1200,
+        object_classes: ["truck"],
+        schedule: { from: "22:00", to: "06:00" },
+      }),
+      names,
+    );
+    expect(dwell).toContain("משאית");
+    expect(dwell).toContain("המחסן");
+    expect(dwell).toContain("מעל 20 דקות");
+    expect(dwell).toContain("22:00–06:00");
+  });
+
+  it("list sentence uses shared when + event outcome without כאשר/פעולה labels", () => {
+    const s = ruleListSentence(
+      rule({ trigger: "zone_enter", zone_id: "z_1", object_classes: ["person"] }, { actions: [{ type: "create_event" }] }),
+      names,
+    );
+    expect(s).toBe('כשאדם נכנס ל"המחסן" → נוצר אירוע');
+    expect(s).not.toContain("כאשר:");
+    expect(s).not.toContain("פעולה:");
+    expect(s).not.toContain("יצירת אירוע");
+  });
+
+  it("display name respects custom titles and replaces generic ones", () => {
+    expect(isGenericRuleName("011")).toBe(true);
+    expect(isGenericRuleName("רכב נכנס דרך שער")).toBe(false);
+    expect(
+      ruleDisplayName(rule({ trigger: "zone_enter", zone_id: "z_1", object_classes: ["person"] }, { name: "011" }), names),
+    ).toContain("אדם");
+    expect(
+      ruleDisplayName(
+        rule({ trigger: "zone_enter", zone_id: "z_1" }, { name: "שער לילי מותאם" }),
+        names,
+      ),
+    ).toBe("שער לילי מותאם");
+  });
+
+  it("maps behavior icons; list order stays stable when enabled flips", () => {
+    expect(ruleIconKey(rule({ trigger: "zone_enter", zone_id: "z_1" }))).toBe("zone_enter");
+    expect(ruleIconKey(rule({ trigger: "dwell", zone_id: "z_1", min_duration_seconds: 60 }))).toBe("dwell");
+    expect(ruleIconKey(rule({ trigger: "count_threshold", threshold: 3 }))).toBe("count_threshold");
+
+    const base = [
+      rule({ trigger: "zone_enter", zone_id: "z_1" }, { id: "a", enabled: true, created_at: "2026-01-03T00:00:00Z" }),
+      rule({ trigger: "zone_enter", zone_id: "z_1" }, { id: "b", enabled: true, created_at: "2026-01-02T00:00:00Z" }),
+      rule({ trigger: "zone_enter", zone_id: "z_1" }, { id: "c", enabled: true, created_at: "2026-01-01T00:00:00Z" }),
+    ];
+    const before = sortRulesOperational(base).map((r) => r.id);
+    expect(before).toEqual(["a", "b", "c"]);
+    const afterDisable = sortRulesOperational(
+      base.map((r) => (r.id === "a" ? { ...r, enabled: false, updated_at: "2026-06-01T00:00:00Z" } : r)),
+    ).map((r) => r.id);
+    // Disabling must not move the row — same order as before.
+    expect(afterDisable).toEqual(before);
+  });
+
+  it("exposes object + frequency lines for list rows", () => {
+    expect(ruleObjectLine(rule({ trigger: "zone_enter", zone_id: "z_1", object_classes: ["person"] }))).toBe("אדם");
+    expect(ruleFrequencyLabel(rule({ trigger: "zone_enter", zone_id: "z_1" }, { cooldown_seconds: 0 }))).toBe("מיידי");
+    expect(ruleFrequencyLabel(rule({ trigger: "zone_enter", zone_id: "z_1" }, { cooldown_seconds: 30 }))).toBe("כל 30 שנ׳");
+    expect(
+      ruleFrequencyLabel(
+        rule({ trigger: "zone_enter", zone_id: "z_1", schedule: { from: "22:00", to: "06:00" } }, { cooldown_seconds: 30 }),
+      ),
+    ).toBe("22:00–06:00");
   });
 });

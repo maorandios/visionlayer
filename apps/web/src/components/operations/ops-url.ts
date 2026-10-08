@@ -2,29 +2,39 @@
  * URL helpers for the camera-first Operations workspace.
  *
  *   /                     → camera grid
- *   /?camera=<id>         → focus mode (overview)
+ *   /?camera=<id>         → focus mode (activity)
  *   /?camera=<id>&tab=…   → focus + panel tab
  */
-export type OpsTab = "overview" | "events" | "rules" | "metrics" | "settings";
+export type OpsTab = "activity" | "events" | "rules";
 
 export const OPS_TABS: { id: OpsTab; label: string }[] = [
-  { id: "overview", label: "סקירה" },
+  { id: "activity", label: "פעילות" },
   { id: "events", label: "אירועים" },
   { id: "rules", label: "חוקים" },
-  { id: "metrics", label: "מדדים" },
-  { id: "settings", label: "הגדרות" },
 ];
 
+/** Legacy tab ids from older deep links. */
+const LEGACY_TAB_MAP: Record<string, OpsTab> = {
+  overview: "activity",
+  metrics: "activity",
+  settings: "activity",
+  zones: "activity",
+  activity: "activity",
+  events: "events",
+  rules: "rules",
+};
+
 export function parseOpsTab(raw: string | null | undefined): OpsTab {
-  if (raw && OPS_TABS.some((t) => t.id === raw)) return raw as OpsTab;
-  return "overview";
+  if (!raw) return "activity";
+  if (OPS_TABS.some((t) => t.id === raw)) return raw as OpsTab;
+  return LEGACY_TAB_MAP[raw] ?? "activity";
 }
 
 export function opsHref(cameraId?: string | null, tab?: OpsTab | null): string {
   if (!cameraId) return "/";
   const params = new URLSearchParams();
   params.set("camera", cameraId);
-  if (tab && tab !== "overview") params.set("tab", tab);
+  if (tab && tab !== "activity") params.set("tab", tab);
   return `/?${params.toString()}`;
 }
 

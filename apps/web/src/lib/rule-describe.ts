@@ -7,6 +7,16 @@
  *   מתי:  08:00–18:00
  *   פעולה: שליחת התראה
  */
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Bell,
+  Clock,
+  Eye,
+  LogIn,
+  LogOut,
+  Users,
+} from "lucide-react";
 import { objectClassHe } from "@/lib/format";
 import {
   OBJECT_BY_ID,
@@ -16,6 +26,7 @@ import {
   pluralGenderForClasses,
   verb,
 } from "@/lib/rule-wizard/config";
+import { inferTrigger } from "@/lib/rule-wizard/convert";
 import type { Rule } from "@/lib/types";
 
 export type RuleNames = {
@@ -245,3 +256,157 @@ export function whenWithCamera(d: Pick<RuleDescription, "when" | "where">): stri
 }
 
 export { TRIGGER_LABEL };
+
+// ---------------------------------------------------------------------------
+// Operational Rules list (camera workspace) — compact layers
+// ---------------------------------------------------------------------------
+
+function cleanPlace(name: string | null | undefined): string | null {
+  if (!name || name === "—") return null;
+  const trimmed = name.trim();
+  return trimmed || null;
+}
+
+/** True when the stored name looks auto-generated / opaque — prefer derived title. */
+export function isGenericRuleName(name: string | null | undefined): boolean {
+  const n = (name ?? "").trim();
+  if (!n) return true;
+  if (/^\d+$/.test(n)) return true;
+  if (/^(rule|חוק)[\s_-]*\d*$/i.test(n)) return true;
+  if (/^[0-9a-f]{8,}(-[0-9a-f]{4,})*$/i.test(n)) return true;
+  return false;
+}
+
+/** Layer 1 — strongest title. Respects custom names; derives when generic. */
+export function ruleDisplayName(rule: Rule, names: RuleNames = {}): string {
+  const stored = rule.name?.trim() ?? "";
+  if (stored && !isGenericRuleName(stored)) return stored;
+  const when = describeRule(rule, names).when.replace(/"/g, "").trim();
+  return when || stored || "חוק";
+}
+
+/** Object class label for list rows ("אדם", "רכב", …). */
+export function ruleObjectLine(rule: Rule): string {
+  const classes = rule.conditions.object_classes ?? [];
+  return triggerKind(rule) === "count" ? objectPlural(classes) : objectLabel(classes);
+}
+
+/**
+ * Frequency / cadence for list rows — schedule window if set, else cooldown.
+ * e.g. "22:00–06:00" · "כל 30 שנ׳" · "מיידי"
+ */
+export function ruleFrequencyLabel(rule: Rule): string {
+  const sched = scheduleHe(rule.conditions.schedule);
+  if (sched) return sched;
+  const cd = rule.cooldown_seconds ?? 0;
+  if (cd <= 0) return "מיידי";
+  if (cd < 60) return `כל ${cd} שנ׳`;
+  if (cd % 3600 === 0) return cd === 3600 ? "כל שעה" : `כל ${cd / 3600} שע׳`;
+  if (cd % 60 === 0) return cd === 60 ? "כל דקה" : `כל ${cd / 60} דק׳`;
+  return `כל ${cd} שנ׳`;
+}
+
+/**
+ * Layer 2 — muted dimensions: object · behavior · place · extras
+ * e.g. "רכב · כניסה · שער ראשי" / "משאית · רציף 2 · מעל 20 דקות"
+ */
+export function ruleContextLine(rule: Rule, names: RuleNames = {}): string {
+  const c = rule.conditions;
+  const kind = triggerKind(rule);
+  const classes = c.object_classes ?? [];
+  const bits: string[] = [];
+
+  bits.push(kind === "count" ? objectPlural(classes) : objectLabel(classes));
+
+  const trig = inferTrigger(c);
+  if (trig === "zone_enter") bits.push("כניסה");
+  else if (trig === "zone_exit") bits.push("יציאה");
+  else if (kind === "line") {
+    const dir = names.directionLabel?.(c.line_id, c.direction) ?? defaultDirectionLabel(c.direction);
+    if (dir) bits.push(dir);
+  }
+
+  const place = c.line_id
+    ? cleanPlace(names.lineName?.(c.line_id))
+    : c.zone_id && !names.isFullFrameZone?.(c.zone_id)
+      ? cleanPlace(names.zoneName?.(c.zone_id))
+      : null;
+  if (place) bits.push(place);
+
+  if (kind === "dwell") {
+    const secs = c.min_duration_seconds ?? 0;
+    if (secs > 0) bits.push(`מעל ${durationHe(secs)}`);
+  }
+
+  if (kind === "count") {
+    const threshold = c.threshold ?? c.count ?? c.aggregation?.threshold ?? 0;
+    const op = operatorHe(c.operator ?? c.aggregation?.operator).trim();
+    const win = c.aggregation_window_seconds ?? c.aggregation?.window_seconds;
+    bits.push(`${op} ${threshold}${win ? windowHe(win) : ""}`.replace(/\s+/g, " ").trim());
+  }
+
+  const sched = scheduleHe(c.schedule);
+  if (sched) bits.push(sched);
+
+  return bits.filter(Boolean).join(" · ");
+}
+
+/**
+ * Layer 3 — natural sentence for the list (no כאשר/פעולה labels).
+ * Camera-scoped: omits camera name. Ends with → נוצר אירוע.
+ */
+export function ruleListSentence(rule: Rule, names: RuleNames = {}): string {
+  const d = describeRule(rule, names);
+  let schedule = "";
+  if (d.schedule) {
+    const timeOnly = d.schedule.includes("–") && !/[א-ת]/.test(d.schedule.split(/\s+/)[0] ?? "");
+    schedule = timeOnly ? ` בין ${d.schedule}` : ` ${d.schedule}`;
+  }
+  const outcome = rule.actions.some((a) => a.type === "push_notification")
+    ? "נשלחת התראה ונוצר אירוע"
+    : "נוצר אירוע";
+  return `כש${d.when}${schedule} → ${outcome}`;
+}
+
+/** Icon key aligned with eventTypeIcon / Lucide mapping. */
+export function ruleIconKey(rule: Rule): string {
+  const kind = triggerKind(rule);
+  if (kind === "dwell") return "dwell";
+  if (kind === "count") return "count_threshold";
+  if (kind === "line") return "line_cross";
+  return inferTrigger(rule.conditions);
+}
+
+/** Subtle Lucide icon for scanning Rules by behavior. */
+export function ruleBehaviorIcon(rule: Rule): LucideIcon {
+  switch (ruleIconKey(rule)) {
+    case "zone_enter":
+      return LogIn;
+    case "zone_exit":
+      return LogOut;
+    case "line_cross":
+      return ArrowLeftRight;
+    case "dwell":
+      return Clock;
+    case "count_threshold":
+      return Users;
+    case "zone_presence":
+      return Eye;
+    default:
+      return Bell;
+  }
+}
+
+/**
+ * Stable Rules list order — by created_at (newest first), then id.
+ * Must NOT reorder on enable/disable: moving a row after toggle makes it look
+ * like a different Rule was switched (click first → disabled jumps to bottom).
+ */
+export function sortRulesOperational(rules: Rule[]): Rule[] {
+  return [...rules].sort((a, b) => {
+    const ca = Date.parse(a.created_at) || 0;
+    const cb = Date.parse(b.created_at) || 0;
+    if (cb !== ca) return cb - ca;
+    return a.id.localeCompare(b.id);
+  });
+}

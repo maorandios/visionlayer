@@ -48,7 +48,7 @@ export function TopBar({ systemActive, newEvents, onOpenMenu }: Props) {
         </p>
         {newEvents > 0 ? (
           <Link
-            href="/events?state=new"
+            href="/events"
             className="rounded-md bg-accent-soft px-2 py-1 text-[11px] font-medium text-accent"
             data-testid="ops-new-events"
             dir="rtl"

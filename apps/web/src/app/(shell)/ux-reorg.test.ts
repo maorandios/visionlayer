@@ -50,22 +50,29 @@ describe("camera-first operations UX", () => {
     expect(ops).toContain("overflow-hidden");
 
     const panel = read("../../components/operations/CameraOpsPanel.tsx");
-    for (const id of ["overview", "events", "rules", "metrics", "settings"]) {
+    for (const id of ["activity", "events", "rules"]) {
       expect(panel).toContain(`"${id}"`);
     }
+    expect(panel).not.toContain('"metrics"');
     expect(panel).not.toContain('"zones"');
+    expect(panel).not.toContain('tab === "settings"');
+    expect(panel).toContain("ActivityPanel");
+    expect(panel).toContain("camera-overflow-menu");
     expect(panel).toContain("rule-create");
     expect(panel).toContain("ops-panel-back");
     expect(panel).toContain("EventDetailView");
     expect(panel).toContain("RuleWizard");
     expect(panel).toContain("embedded");
     expect(panel).not.toContain("camera-tab-zones");
-    expect(panel).toContain("camera-tab-settings");
-    expect(panel).toContain("CameraMetricsPanel");
+    expect(panel).not.toContain("CameraMetricsPanel");
     expect(panel).not.toContain("activityToday");
     expect(panel).toContain("fullWidth");
     expect(panel).not.toContain(`/rules/new?cameraId=`);
-    expect(read("../../components/cameras/CameraMetricsPanel.tsx")).toContain("camera-tab-metrics");
+    expect(read("../../components/operations/ops-url.ts")).toContain('label: "פעילות"');
+    expect(read("../../components/operations/ActivityPanel.tsx")).toContain("camera-tab-activity");
+    expect(read("../../components/operations/ActivityPanel.tsx")).toContain("MetricWizard");
+    expect(read("../../components/metrics/wizard/MetricWizard.tsx")).toContain("metric-wizard");
+    expect(read("../../lib/vision-capabilities.ts")).toContain("VEHICLE_CLASSES");
 
     const stage = read("../../components/operations/CameraStage.tsx");
     expect(stage).toContain("ops-camera-stage");
@@ -102,7 +109,8 @@ describe("camera-first operations UX", () => {
     expect(src).toContain("opsHref");
     expect(src).toContain("parseOpsTab");
     expect(src).toContain("legacyCameraToOps");
-    expect(src).toContain('"settings"');
+    expect(src).toContain('"activity"');
+    expect(src).not.toContain('id: "metrics"');
   });
 
   it("shared primitives still exist", () => {

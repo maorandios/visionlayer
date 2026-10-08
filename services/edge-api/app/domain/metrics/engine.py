@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.models import MetricLedger, MetricSample, MetricState
 from app.domain.spatial import SpatialEvent
+from app.domain.vision_capabilities import VEHICLE_CLASSES
 
 SCOPE_PRODUCTION = "production"
 SCOPE_VIDEO_LAB = "video_lab"
@@ -52,8 +53,6 @@ ALL_METRIC_TYPES: tuple[str, ...] = (
     METRIC_DWELL,
     METRIC_OCCUPANCY_PEAK,
 )
-
-VEHICLE_CLASSES: frozenset[str] = frozenset({"car", "truck", "bus", "motorcycle"})
 
 _LEDGER_CACHE_MAX = 50_000
 

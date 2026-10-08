@@ -34,11 +34,15 @@ describe("video lab UI", () => {
   });
 
   it("event detail can return to video lab run", () => {
-    const src = readFileSync(resolve(__dirname, "../../events/[id]/page.tsx"), "utf8");
-    expect(src).toContain("backToVideoLabRun");
-    expect(src).toContain("video_lab_asset_id");
-    expect(src).toContain("video_lab_run_id");
-    expect(src).toContain("returnTo");
+    const page = readFileSync(resolve(__dirname, "../../events/[id]/page.tsx"), "utf8");
+    const detail = readFileSync(
+      resolve(__dirname, "../../../../components/events/EventDetailView.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("returnTo");
+    expect(detail).toContain("backToVideoLabRun");
+    expect(detail).toContain("video_lab_asset_id");
+    expect(detail).toContain("video_lab_run_id");
   });
 
   it("events list preserves returnTo for lab navigation", () => {

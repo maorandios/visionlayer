@@ -1,19 +1,23 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { legacyCameraToOps, opsHref, parseOpsTab } from "@/components/operations/ops-url";
+import { legacyCameraToOps, opsHref, parseOpsTab, OPS_TABS } from "@/components/operations/ops-url";
 
 describe("cameras / operations UI", () => {
-  it("ops URL helpers encode camera focus and tabs", () => {
+  it("ops URL helpers encode camera focus and primary tabs only", () => {
     expect(opsHref()).toBe("/");
     expect(opsHref("cam_1")).toBe("/?camera=cam_1");
     expect(opsHref("cam_1", "rules")).toBe("/?camera=cam_1&tab=rules");
-    expect(opsHref("cam_1", "overview")).toBe("/?camera=cam_1");
-    expect(parseOpsTab("zones")).toBe("overview");
-    expect(parseOpsTab("nope")).toBe("overview");
+    expect(opsHref("cam_1", "activity")).toBe("/?camera=cam_1");
+    expect(parseOpsTab("zones")).toBe("activity");
+    expect(parseOpsTab("overview")).toBe("activity");
+    expect(parseOpsTab("metrics")).toBe("activity");
+    expect(parseOpsTab("settings")).toBe("activity");
+    expect(parseOpsTab("nope")).toBe("activity");
     expect(legacyCameraToOps("cam_1", "events")).toBe("/?camera=cam_1&tab=events");
-    expect(legacyCameraToOps("cam_1", "settings")).toBe("/?camera=cam_1&tab=settings");
-    expect(parseOpsTab("settings")).toBe("settings");
+    expect(legacyCameraToOps("cam_1", "settings")).toBe("/?camera=cam_1");
+    expect(OPS_TABS.map((t) => t.id)).toEqual(["activity", "events", "rules"]);
+    expect(OPS_TABS.map((t) => t.label)).toEqual(["פעילות", "אירועים", "חוקים"]);
   });
 
   it("new camera page posts create and returns to ops focus", () => {

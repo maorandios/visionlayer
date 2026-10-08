@@ -12,9 +12,11 @@ type Props = {
   points: Point[];
   onChange: (points: Point[]) => void;
   backgroundImageUrl?: string | null;
+  /** Hide endpoint numbers (1 / 2). Prefer off for user-facing Metric flows. */
+  showPointNumbers?: boolean;
 };
 
-export function LineEditor({ points, onChange, backgroundImageUrl }: Props) {
+export function LineEditor({ points, onChange, backgroundImageUrl, showPointNumbers = false }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
@@ -82,13 +84,17 @@ export function LineEditor({ points, onChange, backgroundImageUrl }: Props) {
           {a && b ? (
             <>
               <circle cx={a[0] * W} cy={a[1] * H} r={5} fill="var(--color-accent)" />
-              <text x={a[0] * W + 10} y={a[1] * H - 8} fontSize={14} fill="var(--color-accent)">
-                1
-              </text>
               <circle cx={b[0] * W} cy={b[1] * H} r={5} fill="var(--color-accent)" />
-              <text x={b[0] * W + 10} y={b[1] * H - 8} fontSize={14} fill="var(--color-accent)">
-                2
-              </text>
+              {showPointNumbers ? (
+                <>
+                  <text x={a[0] * W + 10} y={a[1] * H - 8} fontSize={14} fill="var(--color-accent)">
+                    1
+                  </text>
+                  <text x={b[0] * W + 10} y={b[1] * H - 8} fontSize={14} fill="var(--color-accent)">
+                    2
+                  </text>
+                </>
+              ) : null}
             </>
           ) : null}
           {points.map((p, i) => {

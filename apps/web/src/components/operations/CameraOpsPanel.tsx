@@ -1,48 +1,58 @@
 ﻿"use client";
 
-import { ArrowRight, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { EventCard } from "@/components/events/EventCard";
+import { ArrowRight, MoreVertical } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ActivityPanel } from "@/components/operations/ActivityPanel";
 import { EventDetailView } from "@/components/events/EventDetailView";
-import { CameraMetricsPanel } from "@/components/cameras/CameraMetricsPanel";
-import { RuleCard } from "@/components/rules/RuleCard";
+import { EventTimeline } from "@/components/events/EventTimeline";
+import { RulesList } from "@/components/rules/RulesList";
 import { RuleWizard } from "@/components/rules/wizard/RuleWizard";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
-import { KpiCard } from "@/components/ui/KpiCard";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { EmptyBlock } from "@/components/ui/StateBlock";
 import { Tabs } from "@/components/ui/Tabs";
 import { t } from "@/i18n/he";
 import { api } from "@/lib/api";
 import { cameraStatusHe } from "@/lib/format";
-import { describeRule } from "@/lib/rule-describe";
 import type { OpsTab } from "@/components/operations/ops-url";
 import { OPS_TABS } from "@/components/operations/ops-url";
-import type { Camera, Rule } from "@/lib/types";
+import type { Camera, Line, Rule, Zone } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { isVirtualCamera, useCatalog } from "@/providers/CatalogProvider";
 import { useEvents } from "@/providers/EventsProvider";
+import { useToast } from "@/providers/ToastProvider";
 
 type PanelView =
   | { kind: "main" }
   | { kind: "event"; eventId: string }
   | { kind: "rule-create" }
-  | { kind: "rule-edit"; ruleId: string };
+  | { kind: "rule-edit"; ruleId: string }
+  | { kind: "settings" };
 
 type Props = {
   camera: Camera;
+  zones: Zone[];
+  lines: Line[];
   rules: Rule[];
   tab: OpsTab;
   onTabChange: (tab: OpsTab) => void;
-  onToggleRule: (rule: Rule) => Promise<void>;
+  /** Patch only the given Rule id — must not flip sibling Rules. */
+  onToggleRule: (ruleId: string, enabled: boolean) => Promise<void>;
   onCameraUpdated?: () => void;
-  /** Reload rules after in-panel create/edit. */
   onDataChanged?: () => void;
 };
 
-function PanelBack({ title, onBack }: { title: string; onBack: () => void }) {
+function PanelBack({
+  title,
+  onBack,
+  backLabel,
+}: {
+  title?: string;
+  onBack: () => void;
+  backLabel?: string;
+}) {
   return (
     <div className="shrink-0 space-y-1" data-testid="ops-panel-back">
       <button
@@ -51,15 +61,17 @@ function PanelBack({ title, onBack }: { title: string; onBack: () => void }) {
         className="inline-flex min-h-8 items-center gap-1 text-sm text-ink-muted hover:text-ink"
       >
         <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-        {t("back")}
+        {backLabel ?? t("back")}
       </button>
-      <h2 className="text-base font-semibold text-ink">{title}</h2>
+      {title ? <h2 className="text-base font-semibold text-ink">{title}</h2> : null}
     </div>
   );
 }
 
 export function CameraOpsPanel({
   camera,
+  zones,
+  lines,
   rules,
   tab,
   onTabChange,
@@ -67,19 +79,25 @@ export function CameraOpsPanel({
   onCameraUpdated,
   onDataChanged,
 }: Props) {
+  const router = useRouter();
   const { token } = useAuth();
-  const { cameraName, ruleName, ruleNames, zoneName, lineName, refresh: refreshCatalog } = useCatalog();
+  const { ruleName, ruleNames, zoneName, refresh: refreshCatalog } = useCatalog();
   const { events } = useEvents();
+  const { showToast } = useToast();
   const virtualCam = isVirtualCamera(camera);
   const cameraEvents = useMemo(() => events.filter((e) => e.camera_id === camera.id), [events, camera.id]);
-  const newEvents = cameraEvents.filter((e) => e.state === "new");
-  const activeRules = rules.filter((r) => r.enabled);
 
   const [view, setView] = useState<PanelView>({ kind: "main" });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [editName, setEditName] = useState(camera.name);
   const [editLocation, setEditLocation] = useState(camera.location ?? "");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pendingDeleteRule, setPendingDeleteRule] = useState<Rule | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
 
   useEffect(() => {
     setEditName(camera.name);
@@ -89,7 +107,17 @@ export function CameraOpsPanel({
 
   useEffect(() => {
     setView({ kind: "main" });
+    setMenuOpen(false);
   }, [camera.id, tab]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
 
   function goMain() {
     setView({ kind: "main" });
@@ -111,10 +139,62 @@ export function CameraOpsPanel({
         location: editLocation || null,
       });
       onCameraUpdated?.();
+      goMain();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : t("errorSave"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function toggleEnabled() {
+    if (!token) return;
+    setBusy(true);
+    try {
+      if (camera.enabled) await api.cameras.disable(token, camera.id);
+      else await api.cameras.enable(token, camera.id);
+      onCameraUpdated?.();
+    } finally {
+      setBusy(false);
+      setMenuOpen(false);
+    }
+  }
+
+  async function deleteCamera() {
+    if (!token) return;
+    setBusy(true);
+    try {
+      await api.cameras.delete(token, camera.id);
+      router.replace("/");
+    } finally {
+      setBusy(false);
+      setConfirmDelete(false);
+    }
+  }
+
+  async function toggleRuleRow(ruleId: string, enabled: boolean) {
+    if (!token) return;
+    setTogglingRuleId(ruleId);
+    try {
+      await onToggleRule(ruleId, enabled);
+      showToast(enabled ? t("ruleEnabledToast") : t("ruleDisabledToast"), 2200);
+    } catch {
+      showToast(t("ruleToggleErrorToast"), 2800);
+    } finally {
+      setTogglingRuleId(null);
+    }
+  }
+
+  async function deleteRuleConfirm() {
+    if (!token || !pendingDeleteRule) return;
+    setBusy(true);
+    try {
+      await api.rules.delete(token, pendingDeleteRule.id);
+      showToast(t("ruleDeletedToast"), 2200);
+      setPendingDeleteRule(null);
+      await afterDataChange("rules");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -123,7 +203,7 @@ export function CameraOpsPanel({
   if (view.kind === "event") {
     return (
       <div className="flex h-full min-h-0 flex-col gap-3" data-testid="ops-camera-panel" data-panel-view="event">
-        <PanelBack title={t("eventDetail")} onBack={goMain} />
+        <PanelBack backLabel={t("backToEvents")} onBack={goMain} />
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
           <EventDetailView eventId={view.eventId} variant="panel" />
         </div>
@@ -133,11 +213,7 @@ export function CameraOpsPanel({
 
   if (view.kind === "rule-create" || view.kind === "rule-edit") {
     return (
-      <div
-        className="flex h-full min-h-0 flex-col"
-        data-testid="ops-camera-panel"
-        data-panel-view={view.kind}
-      >
+      <div className="flex h-full min-h-0 flex-col" data-testid="ops-camera-panel" data-panel-view={view.kind}>
         <RuleWizard
           embedded
           mode={view.kind === "rule-edit" ? "edit" : "create"}
@@ -148,6 +224,30 @@ export function CameraOpsPanel({
             void afterDataChange("rules");
           }}
         />
+      </div>
+    );
+  }
+
+  if (view.kind === "settings") {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-3" data-testid="ops-camera-panel" data-panel-view="settings">
+        <PanelBack title={t("cameraSettings")} onBack={goMain} />
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
+          <div className="glass space-y-3 rounded-lg p-4" data-testid="camera-tab-settings">
+            <div>
+              <label className="mb-1 block text-xs text-ink-muted">{t("cameraName")}</label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-ink-muted">{t("cameraLocation")}</label>
+              <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
+            </div>
+            {saveError ? <p className="text-sm text-danger">{saveError}</p> : null}
+            <Button onClick={() => void saveSettings()} disabled={saving} className="w-full">
+              {saving ? t("loading") : t("save")}
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -167,6 +267,50 @@ export function CameraOpsPanel({
             {camera.enabled ? cameraStatusHe(camera.status) : t("disabled")}
           </span>
           {virtualCam ? <Chip tone="dashed">{t("devSourceBadge")}</Chip> : null}
+          <div className="relative ms-auto" ref={menuRef}>
+            <button
+              type="button"
+              aria-label={t("cameraMenu")}
+              aria-expanded={menuOpen}
+              data-testid="camera-overflow-menu"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-white/5 hover:text-ink"
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <MoreVertical className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+            </button>
+            {menuOpen ? (
+              <div className="glass-strong absolute end-0 top-9 z-20 min-w-[11rem] rounded-lg py-1 shadow-float">
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-start text-sm text-ink hover:bg-white/5"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setView({ kind: "settings" });
+                  }}
+                >
+                  {t("editCameraName")}
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-start text-sm text-ink hover:bg-white/5"
+                  disabled={busy}
+                  onClick={() => void toggleEnabled()}
+                >
+                  {camera.enabled ? t("disableCamera") : t("enableCamera")}
+                </button>
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-start text-sm text-danger hover:bg-white/5"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setConfirmDelete(true);
+                  }}
+                >
+                  {t("deleteCamera")}
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
         {camera.location ? <p className="text-sm text-ink-muted">{camera.location}</p> : null}
       </div>
@@ -183,139 +327,71 @@ export function CameraOpsPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
-        {tab === "overview" ? (
-          <div className="space-y-4" data-testid="camera-tab-overview">
-            <div className="grid grid-cols-3 gap-2.5">
-              <KpiCard size="lg" label={t("activeRulesCount")} value={activeRules.length} />
-              <KpiCard size="lg" label={t("newEventsCount")} value={newEvents.length} />
-              <KpiCard size="lg" label={t("eventsShort")} value={cameraEvents.length} />
-            </div>
-            <section>
-              <SectionHeader
-                title={t("recentEvents")}
-                action={
-                  <button
-                    type="button"
-                    className="text-xs text-ink-muted hover:text-ink"
-                    onClick={() => onTabChange("events")}
-                  >
-                    {t("viewAll")} ›
-                  </button>
-                }
-              />
-              {cameraEvents.length === 0 ? (
-                <p className="text-sm text-ink-muted">{t("noEventsForCamera")}</p>
-              ) : (
-                <ul className="space-y-2">
-                  {cameraEvents.slice(0, 3).map((ev) => (
-                    <li key={ev.id}>
-                      <EventCard
-                        event={ev}
-                        token={token}
-                        onSelect={() => setView({ kind: "event", eventId: ev.id })}
-                        cameraName={cameraName(ev.camera_id)}
-                        variant="compact"
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-            <Button className="w-full" onClick={() => setView({ kind: "rule-create" })}>
-              <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-              {t("createRuleCta")}
-            </Button>
-          </div>
+        {tab === "activity" ? (
+          <ActivityPanel
+            cameraId={camera.id}
+            virtualCam={virtualCam}
+            zones={zones}
+            lines={lines}
+            zoneName={zoneName}
+            onCatalogRefresh={() => void refreshCatalog()}
+          />
         ) : null}
 
         {tab === "events" ? (
-          <div data-testid="camera-tab-events">
-            {cameraEvents.length === 0 ? (
-              <EmptyBlock message={t("noEventsForCamera")} />
-            ) : (
-              <ul className="space-y-2">
-                {cameraEvents.map((ev) => (
-                  <li key={ev.id}>
-                    <EventCard
-                      event={ev}
-                      token={token}
-                      onSelect={() => setView({ kind: "event", eventId: ev.id })}
-                      cameraName={cameraName(ev.camera_id)}
-                      ruleName={ruleName(ev.rule_id)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="space-y-3" data-testid="camera-tab-events">
+            <EventTimeline
+              events={cameraEvents}
+              emptyMessage={t("noEventsForCamera")}
+              emptyHint={t("eventsEmptyHintCamera")}
+              emptyAction={
+                <Button variant="secondary" size="sm" onClick={() => onTabChange("rules")}>
+                  {t("goToRules")}
+                </Button>
+              }
+              ruleName={ruleName}
+              onSelect={(eventId) => setView({ kind: "event", eventId })}
+            />
           </div>
         ) : null}
 
         {tab === "rules" ? (
-          <div className="space-y-3" data-testid="camera-tab-rules">
-            <Button variant="secondary" size="sm" onClick={() => setView({ kind: "rule-create" })}>
-              <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-              {t("createRuleCta")}
-            </Button>
-            {rules.length === 0 ? (
-              <EmptyBlock message={t("emptyRules")} />
-            ) : (
-              <ul className="space-y-3">
-                {rules.map((rule) => (
-                  <li key={rule.id}>
-                    <RuleCard
-                      rule={rule}
-                      description={describeRule(rule, ruleNames)}
-                      showCamera={false}
-                      actions={
-                        <>
-                          <Button variant="secondary" size="sm" onClick={() => void onToggleRule(rule)}>
-                            {rule.enabled ? t("disable") : t("enable")}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setView({ kind: "rule-edit", ruleId: rule.id })}
-                          >
-                            {t("edit")}
-                          </Button>
-                        </>
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ) : null}
-
-        {tab === "metrics" ? (
-          <CameraMetricsPanel
-            cameraId={camera.id}
-            virtualCam={virtualCam}
-            zoneName={zoneName}
-            lineName={lineName}
+          <RulesList
+            rules={rules}
+            names={ruleNames}
+            onCreate={() => setView({ kind: "rule-create" })}
+            onOpen={(ruleId) => setView({ kind: "rule-edit", ruleId })}
+            onEdit={(ruleId) => setView({ kind: "rule-edit", ruleId })}
+            onToggle={(ruleId, enabled) => void toggleRuleRow(ruleId, enabled)}
+            onDelete={(ruleId) => {
+              const found = rules.find((r) => r.id === ruleId) ?? null;
+              setPendingDeleteRule(found);
+            }}
+            togglingId={togglingRuleId}
           />
         ) : null}
-
-        {tab === "settings" ? (
-          <div className="space-y-4" data-testid="camera-tab-settings">
-            <div className="glass space-y-3 rounded-lg p-4">
-              <div>
-                <label className="mb-1 block text-xs text-ink-muted">{t("cameraName")}</label>
-                <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs text-ink-muted">{t("cameraLocation")}</label>
-                <Input value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
-              </div>
-              {saveError ? <p className="text-sm text-danger">{saveError}</p> : null}
-              <Button onClick={() => void saveSettings()} disabled={saving} className="w-full">
-                {saving ? t("loading") : t("save")}
-              </Button>
-            </div>
-          </div>
-        ) : null}
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={t("deleteCamera")}
+        description={t("deleteCameraConfirm")}
+        confirmLabel={t("delete")}
+        onConfirm={() => void deleteCamera()}
+        onCancel={() => setConfirmDelete(false)}
+        busy={busy}
+      />
+      <ConfirmDialog
+        open={pendingDeleteRule !== null}
+        title={t("deleteRule")}
+        description={
+          pendingDeleteRule ? `${pendingDeleteRule.name} — ${t("ruleDeleteConfirm")}` : undefined
+        }
+        confirmLabel={t("delete")}
+        onConfirm={() => void deleteRuleConfirm()}
+        onCancel={() => setPendingDeleteRule(null)}
+        busy={busy}
+      />
     </div>
   );
 }

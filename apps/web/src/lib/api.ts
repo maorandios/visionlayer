@@ -14,6 +14,7 @@ import type {
   User,
   Zone,
 } from "@/lib/types";
+import type { MetricDefinition } from "@/lib/metric-wizard/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -278,6 +279,33 @@ export const api = {
         {},
         token,
       );
+    },
+  },
+
+  /** Persisted Metric Definitions (what the camera continuously measures). */
+  metricDefinitions: {
+    list(token: string, cameraId: string) {
+      return request<MetricDefinition[]>(`/api/v1/cameras/${cameraId}/metrics`, {}, token);
+    },
+    create(token: string, cameraId: string, body: Record<string, unknown>) {
+      return request<MetricDefinition>(
+        `/api/v1/cameras/${cameraId}/metrics`,
+        { method: "POST", body: JSON.stringify(body) },
+        token,
+      );
+    },
+    get(token: string, id: string) {
+      return request<MetricDefinition>(`/api/v1/metric-definitions/${id}`, {}, token);
+    },
+    update(token: string, id: string, body: Record<string, unknown>) {
+      return request<MetricDefinition>(
+        `/api/v1/metric-definitions/${id}`,
+        { method: "PATCH", body: JSON.stringify(body) },
+        token,
+      );
+    },
+    delete(token: string, id: string) {
+      return request<void>(`/api/v1/metric-definitions/${id}`, { method: "DELETE" }, token);
     },
   },
 
