@@ -18,7 +18,71 @@ export function StepPlace() {
   const { state } = useWizard();
   const need = spatialRequirement(state.action, state.countMode);
   if (need === "line") return <PlaceLine />;
+  if (state.action === "detected") return <PlaceDetected />;
   return <PlaceZone />;
+}
+
+/** Detected in camera — full field of view (default) or a specific zone. */
+function PlaceDetected() {
+  const { state, choose, zones } = useWizard();
+  const [creating, setCreating] = useState(false);
+  const list = zones
+    .filter((z) => z.camera_id === state.cameraId && z.enabled)
+    .filter((z, i, arr) => arr.findIndex((x) => x.id === z.id) === i);
+  const fullFrame = !state.zoneId;
+
+  if (creating) {
+    return (
+      <div className="space-y-4">
+        <StepTitle title="אזור חדש" hint="הקישו על התמונה כדי להוסיף נקודות סביב האזור." />
+        <InlineZoneCreator
+          onCancel={() => setCreating(false)}
+          onCreated={(zone) => {
+            choose({ zoneId: zone.id });
+            setCreating(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4" data-testid="wizard-detected-scope">
+      <StepTitle title="איפה לזהות?" hint="ברירת המחדל היא כל שדה הראייה של המצלמה." />
+      <ul className="grid gap-3 sm:grid-cols-2">
+        <li>
+          <PlaceCard
+            selected={fullFrame}
+            name="כל שדה הראייה"
+            onClick={() => choose({ zoneId: null })}
+            preview={
+              <CameraSnapshot
+                cameraId={state.cameraId}
+                fullFrame
+                rounded="rounded-none"
+                className="border-0"
+              />
+            }
+            testId="wizard-scope-full-frame"
+          />
+        </li>
+        {list.map((z, i) => (
+          <li key={`${z.id}-${i}`}>
+            <PlaceCard
+              selected={state.zoneId === z.id}
+              name={z.name}
+              onClick={() => choose({ zoneId: z.id })}
+              preview={<CameraSnapshot cameraId={z.camera_id} zone={z} rounded="rounded-none" className="border-0" />}
+              testId="wizard-zone-card"
+            />
+          </li>
+        ))}
+        <li>
+          <NewPlaceCard label="אזור מסוים חדש" onClick={() => setCreating(true)} testId="wizard-zone-new" />
+        </li>
+      </ul>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -31,7 +95,12 @@ function PlaceZone() {
   const list = zones
     .filter((z) => z.camera_id === state.cameraId && z.enabled)
     .filter((z, i, arr) => arr.findIndex((x) => x.id === z.id) === i);
-  const question = state.action === "zone_exit" ? "מאיזה אזור?" : "באיזה אזור?";
+  const question =
+    state.action === "zone_exit"
+      ? "מאיזה אזור?"
+      : state.action === "zone_enter"
+        ? "לאיזה אזור?"
+        : "באיזה אזור?";
 
   if (creating || list.length === 0) {
     return (

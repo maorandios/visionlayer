@@ -61,7 +61,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!token) {
@@ -69,6 +69,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       setZones([]);
       setLines([]);
       setRules([]);
+      setLoading(false);
       return;
     }
     setLoading(true);

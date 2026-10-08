@@ -3,9 +3,10 @@
 import { Layers, Menu } from "lucide-react";
 import Link from "next/link";
 import { t } from "@/i18n/he";
+import type { HealthLevel } from "@/lib/system-health";
 
 type Props = {
-  systemActive: boolean;
+  systemLevel: HealthLevel;
   newEvents: number;
   onOpenMenu: () => void;
 };
@@ -15,14 +16,26 @@ type Props = {
  *   LEFT  = menu icon (+ optional status)
  *   RIGHT = logo + VisionLayer
  */
-export function TopBar({ systemActive, newEvents, onOpenMenu }: Props) {
+export function TopBar({ systemLevel, newEvents, onOpenMenu }: Props) {
+  const statusLabel =
+    systemLevel === "ok"
+      ? t("homeSystemActive")
+      : systemLevel === "attention"
+        ? t("systemAttention")
+        : t("homeSystemPartial");
+  const dotClass =
+    systemLevel === "ok"
+      ? "bg-success shadow-[0_0_6px_var(--color-success)]"
+      : systemLevel === "attention"
+        ? "bg-warning"
+        : "bg-danger/80";
+
   return (
     <header
       dir="ltr"
       className="relative z-40 flex h-12 w-full shrink-0 items-center px-3 sm:px-4"
       data-testid="ops-topbar"
     >
-      {/* Far physical LEFT */}
       <button
         type="button"
         onClick={onOpenMenu}
@@ -34,18 +47,15 @@ export function TopBar({ systemActive, newEvents, onOpenMenu }: Props) {
       </button>
 
       <div className="ms-3 flex min-w-0 items-center gap-2.5">
-        <p
-          className="hidden items-center gap-1.5 text-[11px] text-ink-muted sm:flex"
+        <Link
+          href="/system-status"
+          className="hidden items-center gap-1.5 text-[11px] text-ink-muted hover:text-ink sm:flex"
           data-testid="ops-system-status"
+          dir="rtl"
         >
-          <span
-            className={`inline-block h-1.5 w-1.5 rounded-full ${
-              systemActive ? "bg-success shadow-[0_0_6px_var(--color-success)]" : "bg-warning"
-            }`}
-            aria-hidden
-          />
-          <span dir="rtl">{systemActive ? t("homeSystemActive") : t("homeSystemPartial")}</span>
-        </p>
+          <span className={`inline-block h-1.5 w-1.5 rounded-full ${dotClass}`} aria-hidden />
+          <span>{statusLabel}</span>
+        </Link>
         {newEvents > 0 ? (
           <Link
             href="/events"
@@ -58,7 +68,6 @@ export function TopBar({ systemActive, newEvents, onOpenMenu }: Props) {
         ) : null}
       </div>
 
-      {/* Far physical RIGHT — logo + name */}
       <Link
         href="/"
         className="ml-auto flex shrink-0 items-center gap-2"

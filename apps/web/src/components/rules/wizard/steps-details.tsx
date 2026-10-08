@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { Bell, CalendarClock, ChevronDown, FileVideo } from "lucide-react";
+import { CalendarClock, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { ChoiceCard, ChoicePill } from "@/components/rules/wizard/ChoiceCard";
@@ -82,15 +82,16 @@ function DurationBlock() {
 
 function DirectionBlock() {
   const { state, update, names } = useWizard();
-  const labelFor = (d: WizardDirection) => (d === "any" ? "כל כיוון" : names.directionLabel?.(state.lineId, d) ?? "");
+  const labelFor = (d: WizardDirection) =>
+    d === "any" ? "שני הכיוונים" : names.directionLabel?.(state.lineId, d) ?? "";
   const options: { id: WizardDirection; title: string; description: string }[] = [
-    { id: "any", title: "כל כיוון", description: "כל חצייה של הקו נחשבת." },
-    { id: "a_to_b", title: labelFor("a_to_b"), description: "רק מעבר בכיוון הזה." },
-    { id: "b_to_a", title: labelFor("b_to_a"), description: "רק מעבר בכיוון הזה." },
+    { id: "any", title: "שני הכיוונים", description: "כל חצייה של הקו נחשבת." },
+    { id: "a_to_b", title: labelFor("a_to_b") || "כיוון אחד", description: "רק מעבר בכיוון הזה." },
+    { id: "b_to_a", title: labelFor("b_to_a") || "כיוון אחד", description: "רק מעבר בכיוון הזה." },
   ];
   return (
     <section className="space-y-3" data-testid="wizard-direction">
-      {state.action === "count" ? <h3 className="text-sm font-medium text-ink">באיזה כיוון?</h3> : null}
+      <h3 className="text-sm font-medium text-ink">איזה כיוון צריך להפעיל את החוק?</h3>
       <ul className="grid gap-2 sm:grid-cols-3">
         {options.map((o) => (
           <li key={o.id}>
@@ -233,8 +234,8 @@ export function StepConditions() {
 
   return (
     <div className="space-y-4">
-      <StepTitle title="תנאים נוספים" hint="לא חובה. כברירת מחדל החוק פעיל כל הזמן." />
-      <div className="grid gap-2 sm:grid-cols-2">
+      <StepTitle title="מתי החוק פעיל?" />
+      <div className="grid gap-2 sm:grid-cols-2" data-testid="wizard-step-when">
         <ChoiceCard
           icon={CalendarClock}
           title="כל הזמן"
@@ -248,7 +249,7 @@ export function StepConditions() {
         />
         <ChoiceCard
           icon={CalendarClock}
-          title="רק בשעות מסוימות"
+          title="בשעות מוגדרות"
           description="למשל בלילה או מחוץ לשעות הפעילות."
           selected={custom}
           onClick={() => {
@@ -313,40 +314,6 @@ export function StepConditions() {
           ) : null}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Outcome
-// ---------------------------------------------------------------------------
-
-export function StepOutcome() {
-  const { state, update, notifyAvailable } = useWizard();
-  return (
-    <div className="space-y-4">
-      <StepTitle title="מה לעשות כשזה קורה?" />
-      <div className="grid gap-2 sm:grid-cols-2">
-        <ChoiceCard
-          icon={FileVideo}
-          title="צור אירוע"
-          description="האירוע יישמר עם תמונה וקטע וידאו, ויופיע ברשימת האירועים ובתובנות."
-          selected
-          testId="wizard-outcome-event"
-        >
-          <span className="mt-1 block text-[11px] text-surface/70">תמיד פעיל</span>
-        </ChoiceCard>
-        <ChoiceCard
-          icon={Bell}
-          title="שלח התראה"
-          description="התראה למכשיר שלכם ברגע שהחוק מופעל."
-          selected={state.outcome.notify}
-          disabled={!notifyAvailable}
-          unavailableNote={notifyAvailable ? undefined : "לא זמין עדיין בהתקנה זו"}
-          onClick={() => update({ outcome: { createEvent: true, notify: !state.outcome.notify } })}
-          testId="wizard-outcome-notify"
-        />
-      </div>
     </div>
   );
 }

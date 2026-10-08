@@ -14,7 +14,7 @@ export type WizardActionId =
   | "zone_presence" // נמצא באזור
   | "dwell" // נשאר באזור (duration)
   | "line_cross" // חצה קו
-  | "count"; // ספירת אובייקטים
+  | "count"; // הכמות עברה סף
 
 /** User-facing object choices. "vehicle" is a group of classes. */
 export type WizardObjectId = "person" | "vehicle" | "car" | "truck" | "motorcycle" | "bicycle" | "bus";
@@ -24,8 +24,6 @@ export type CountMode = "zone" | "zone_exit" | "line";
 
 export type WizardDirection = "any" | "a_to_b" | "b_to_a";
 
-export type WizardMethod = "template" | "custom";
-
 export type WizardSchedule =
   | { mode: "always" }
   | { mode: "custom"; from: string; to: string; days: number[] | null };
@@ -33,6 +31,7 @@ export type WizardSchedule =
 export type WizardOutcome = {
   /** Always true — every rule produces an event. Kept explicit for future outcomes. */
   createEvent: true;
+  /** Legacy-only; new Rules never set this from the UI. */
   notify: boolean;
 };
 
@@ -50,8 +49,6 @@ export type LegacyInfo = {
 
 export type RuleWizardState = {
   cameraId: string | null;
-  method: WizardMethod | null;
-  templateId: string | null;
   action: WizardActionId | null;
   object: WizardObjectId | null;
   zoneId: string | null;
@@ -73,26 +70,25 @@ export type RuleWizardState = {
   legacy: LegacyInfo | null;
 };
 
+/**
+ * Universal flow steps:
+ *   [camera?] → object → action → [count_mode?] → [place?] → [details?] → conditions → review
+ */
 export type StepId =
   | "camera"
-  | "method"
-  | "template"
-  | "action"
   | "object"
+  | "action"
   | "count_mode"
   | "place"
   | "details"
   | "conditions"
-  | "outcome"
   | "review";
 
 /** Coarse progress groups shown to the user. */
-export type StepGroup = "camera" | "kind" | "setup" | "conditions" | "outcome" | "review";
+export type StepGroup = "camera" | "object" | "happens" | "place" | "when" | "review";
 
 export const DEFAULT_WIZARD_STATE: RuleWizardState = {
   cameraId: null,
-  method: null,
-  templateId: null,
   action: null,
   object: null,
   zoneId: null,

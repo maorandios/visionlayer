@@ -1,29 +1,27 @@
 /**
  * Dynamic step list + contextual validation for the Rule Wizard.
+ * Universal flow: Object → What happens → Place? → When → Summary
  */
-import { ACTION_BY_ID, TEMPLATE_BY_ID, spatialRequirement, templateDefines } from "@/lib/rule-wizard/config";
+import { ACTION_BY_ID, spatialRequirement } from "@/lib/rule-wizard/config";
 import type { RuleWizardState, StepGroup, StepId } from "@/lib/rule-wizard/types";
 
 export const STEP_GROUPS: { id: StepGroup; label: string }[] = [
   { id: "camera", label: "מצלמה" },
-  { id: "kind", label: "סוג החוק" },
-  { id: "setup", label: "הגדרה" },
-  { id: "conditions", label: "תנאים" },
-  { id: "outcome", label: "פעולה" },
+  { id: "object", label: "אובייקט" },
+  { id: "happens", label: "מה קורה" },
+  { id: "place", label: "מקום" },
+  { id: "when", label: "מועד" },
   { id: "review", label: "סיכום" },
 ];
 
 export const STEP_GROUP_OF: Record<StepId, StepGroup> = {
   camera: "camera",
-  method: "kind",
-  template: "kind",
-  action: "kind",
-  object: "kind",
-  count_mode: "setup",
-  place: "setup",
-  details: "setup",
-  conditions: "conditions",
-  outcome: "outcome",
+  object: "object",
+  action: "happens",
+  count_mode: "happens",
+  place: "place",
+  details: "place",
+  conditions: "when",
   review: "review",
 };
 
@@ -32,33 +30,27 @@ export function detailsNeeded(state: RuleWizardState): boolean {
   if (!state.action) return false;
   const req = ACTION_BY_ID[state.action].requires;
   if (req.duration || req.direction) return true;
-  if (state.action === "count") return true; // threshold question (+ direction for lines)
+  if (state.action === "count") return true;
   if (state.legacy?.presenceDurationSeconds) return true;
   return false;
 }
 
 /**
- * Ordered steps for the current state. Irrelevant steps are omitted, e.g. a simple "detected"
- * rule never sees zone / line / details screens.
+ * Ordered steps for the current state.
+ * Camera is omitted when already selected (camera-scoped / deep-link create).
+ * Place is omitted when the trigger needs no spatial configuration
+ * (except "detected", which offers full-frame vs zone).
  */
 export function computeSteps(state: RuleWizardState): StepId[] {
-  const steps: StepId[] = ["camera", "method"];
-  if (state.method === "template") {
-    steps.push("template");
-    const tpl = state.templateId ? TEMPLATE_BY_ID[state.templateId] : null;
-    const defined = tpl ? templateDefines(tpl) : { action: false, object: false, countMode: false };
-    if (!defined.action) steps.push("action");
-    if (!defined.object) steps.push("object");
-    if (state.action === "count" && !defined.countMode) steps.push("count_mode");
-  } else if (state.method === "custom") {
-    steps.push("action", "object");
-    if (state.action === "count") steps.push("count_mode");
-  } else {
-    return steps;
-  }
-  if (spatialRequirement(state.action, state.countMode)) steps.push("place");
+  const steps: StepId[] = [];
+  if (!state.cameraId) steps.push("camera");
+  steps.push("object", "action");
+  if (state.action === "count") steps.push("count_mode");
+
+  const spatial = spatialRequirement(state.action, state.countMode);
+  if (spatial || state.action === "detected") steps.push("place");
   if (detailsNeeded(state)) steps.push("details");
-  steps.push("conditions", "outcome", "review");
+  steps.push("conditions", "review");
   return steps;
 }
 
@@ -67,17 +59,14 @@ export function stepError(state: RuleWizardState, step: StepId): string | null {
   switch (step) {
     case "camera":
       return state.cameraId ? null : "יש לבחור מצלמה כדי להמשיך.";
-    case "method":
-      return state.method ? null : "בחרו איך להתחיל.";
-    case "template":
-      return state.templateId ? null : "בחרו תבנית כדי להמשיך.";
-    case "action":
-      return state.action ? null : "בחרו מה צריך לקרות.";
     case "object":
       return state.object || state.legacy?.objectClasses?.length ? null : "בחרו מה לזהות.";
+    case "action":
+      return state.action ? null : "בחרו מה צריך לקרות.";
     case "count_mode":
-      return state.countMode ? null : "בחרו מתי לספור.";
+      return state.countMode ? null : "בחרו איפה לספור.";
     case "place": {
+      if (state.action === "detected") return null; // full-frame when zoneId is null
       const need = spatialRequirement(state.action, state.countMode);
       if (need === "zone" && !state.zoneId) return "יש לבחור אזור כדי להמשיך.";
       if (need === "line" && !state.lineId) return "יש לבחור קו כדי להמשיך.";

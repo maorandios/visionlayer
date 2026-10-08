@@ -47,8 +47,8 @@ function OperationsInner() {
       } else {
         setRules([]);
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t("errorLoad"));
+    } catch {
+      setError(t("dataLoadError"));
     } finally {
       setLoading(false);
     }
@@ -162,18 +162,14 @@ function OperationsInner() {
           message={t("opsEmptyTitle")}
           hint={t("opsEmptyBody")}
           action={
-            isDevEnvironment(hub) ? (
-              <Link href="/dev/video-lab">
-                <Button>{t("openVideoLab")}</Button>
-              </Link>
-            ) : (
+            <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
               <Link href="/cameras/new">
-                <Button>
+                <Button data-testid="ops-empty-add-camera">
                   <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  {t("addCamera")}
+                  {t("cameraAddCta")}
                 </Button>
               </Link>
-            )
+            </div>
           }
         />
       </div>
@@ -202,20 +198,12 @@ function OperationsInner() {
           <h1 className="text-xl font-semibold text-ink">{t("cameraOpsTitle")}</h1>
           <p className="mt-0.5 text-sm text-ink-muted">{t("productionCameras")}</p>
         </div>
-        {isDevEnvironment(hub) ? (
-          <Link href="/dev/video-lab">
-            <Button variant="secondary" size="sm">
-              {t("openVideoLab")}
-            </Button>
-          </Link>
-        ) : (
-          <Link href="/cameras/new">
-            <Button size="sm">
-              <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-              {t("addCamera")}
-            </Button>
-          </Link>
-        )}
+        <Link href="/cameras/new">
+          <Button size="sm" data-testid="ops-add-camera">
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+            {t("cameraAddCta")}
+          </Button>
+        </Link>
       </div>
 
       {productionExists ? renderGrid(real) : null}

@@ -3,8 +3,6 @@ import { describeRule, ruleSentence } from "@/lib/rule-describe";
 import {
   ACTIONS,
   OBJECTS,
-  TEMPLATES,
-  TEMPLATE_BY_ID,
   availableObjects,
   isCombinationSupported,
   objectForClasses,
@@ -13,7 +11,6 @@ import {
 import {
   FULL_FRAME_PLACEHOLDER_ID,
   FULL_FRAME_POINTS,
-  applyTemplate,
   isFullFramePoints,
   previewRule,
   ruleToWizard,
@@ -47,24 +44,24 @@ function asRule(payload: ReturnType<typeof wizardToRule>, id = "r1"): Rule {
   return { id, ...payload, last_triggered_at: null, created_at: "", updated_at: "" };
 }
 
-function state(partial: Partial<RuleWizardState>): RuleWizardState {
-  return { ...DEFAULT_WIZARD_STATE, cameraId: "cam_1", method: "custom", ...partial };
+function state(partial: Partial<RuleWizardState> = {}): RuleWizardState {
+  return { ...DEFAULT_WIZARD_STATE, cameraId: "cam_1", ...partial };
 }
 
 // ---------------------------------------------------------------------------
 
 describe("config", () => {
-  it("has the seven user-facing actions and seven object choices without technical names", () => {
+  it("has the seven user-facing actions and capability-driven objects without technical names", () => {
     expect(ACTIONS.map((a) => a.label)).toEqual([
       "זוהה במצלמה",
       "נכנס לאזור",
       "יצא מאזור",
       "נמצא באזור",
-      "נשאר באזור",
+      "נשאר באזור זמן מסוים",
       "חצה קו",
-      "ספירת אובייקטים",
+      "הכמות עברה סף",
     ]);
-    expect(OBJECTS.map((o) => o.label)).toEqual(["אדם", "רכב", "מכונית", "משאית", "אופנוע", "אופניים", "אוטובוס"]);
+    expect(OBJECTS.map((o) => o.label)).toEqual(["אדם", "רכב", "מכונית", "משאית", "אוטובוס", "אופנוע", "אופניים"]);
     for (const a of ACTIONS) {
       for (const token of ["zone_presence", "line_cross", "count_threshold", "a_to_b"]) {
         expect(`${a.label} ${a.description}`).not.toContain(token);
@@ -83,64 +80,43 @@ describe("config", () => {
     expect(isCombinationSupported("line_cross", "truck")).toBe(true);
     expect(availableObjects("count").map((o) => o.id)).toContain("vehicle");
   });
-
-  it("templates are only preconfigured wizard state and cover the required scenarios", () => {
-    const ids = TEMPLATES.map((t) => t.id);
-    for (const required of [
-      "person_enter",
-      "person_forbidden",
-      "person_dwell",
-      "person_after_hours",
-      "vehicle_enter",
-      "vehicle_exit",
-      "truck_enter",
-      "vehicle_cross_gate",
-      "vehicle_count",
-      "people_count",
-      "truck_count",
-      "zone_occupancy",
-    ]) {
-      expect(ids).toContain(required);
-    }
-    for (const tpl of TEMPLATES) {
-      expect(tpl.preset.action).toBeTruthy();
-      expect(tpl.preset.object).toBeTruthy();
-      expect(tpl.preset.zoneId).toBeUndefined();
-      expect(tpl.preset.lineId).toBeUndefined();
-    }
-  });
 });
 
 // ---------------------------------------------------------------------------
 
-describe("computeSteps", () => {
-  it("skips irrelevant steps for a simple 'detected' rule", () => {
+describe("computeSteps — universal flow", () => {
+  it("camera-scoped detected: object → action → place (scope) → when → summary", () => {
     const s = state({ action: "detected", object: "vehicle" });
-    expect(computeSteps(s)).toEqual(["camera", "method", "action", "object", "conditions", "outcome", "review"]);
+    expect(computeSteps(s)).toEqual(["object", "action", "place", "conditions", "review"]);
   });
 
-  it("asks only what the template did not define", () => {
-    const s = applyTemplate(state({ method: "template" }), "truck_enter");
-    expect(computeSteps(s)).toEqual(["camera", "method", "template", "place", "details", "conditions", "outcome", "review"]);
+  it("without camera: starts with camera selection", () => {
+    expect(computeSteps(state({ cameraId: null, object: "person" }))[0]).toBe("camera");
   });
 
-  it("includes count mode and place for custom count rules", () => {
+  it("includes count mode, place and details for count rules", () => {
     const s = state({ action: "count", object: "truck", countMode: "line" });
-    expect(computeSteps(s)).toEqual([
-      "camera",
-      "method",
-      "action",
-      "object",
-      "count_mode",
-      "place",
-      "details",
-      "conditions",
-      "outcome",
-      "review",
-    ]);
+    expect(computeSteps(s)).toEqual(["object", "action", "count_mode", "place", "details", "conditions", "review"]);
     expect(spatialRequirement("count", "zone")).toBe("zone");
     expect(spatialRequirement("count", "zone_exit")).toBe("zone");
     expect(spatialRequirement("count", "line")).toBe("line");
+  });
+
+  it("zone enter needs place but not details", () => {
+    expect(computeSteps(state({ action: "zone_enter", object: "person" }))).toEqual([
+      "object",
+      "action",
+      "place",
+      "conditions",
+      "review",
+    ]);
+  });
+
+  it("never includes template/method/outcome steps", () => {
+    const steps = computeSteps(state({ action: "line_cross", object: "truck", countMode: null }));
+    expect(steps).not.toContain("method");
+    expect(steps).not.toContain("template");
+    expect(steps).not.toContain("outcome");
   });
 
   it("gives contextual Hebrew validation messages", () => {
@@ -159,11 +135,8 @@ describe("computeSteps", () => {
 // ---------------------------------------------------------------------------
 
 describe("wizardToRule — required flows", () => {
-  it("template: משאית נכנסת → line → direction → valid schema", () => {
-    let s = applyTemplate(state({ method: "template" }), "truck_enter");
-    expect(s.action).toBe("line_cross");
-    expect(s.object).toBe("truck");
-    s = { ...s, lineId: "l_gate", direction: "a_to_b" };
+  it("line_cross truck with direction → valid schema", () => {
+    const s = state({ action: "line_cross", object: "truck", lineId: "l_gate", direction: "a_to_b" });
     expect(firstIncompleteStep(s)).toBeNull();
     const payload = wizardToRule(s, { name: suggestRuleName(s, names) });
     expect(payload).toEqual({
@@ -181,7 +154,7 @@ describe("wizardToRule — required flows", () => {
     });
   });
 
-  it("custom: אדם נכנס למחסן", () => {
+  it("אדם נכנס למחסן", () => {
     const s = state({ action: "zone_enter", object: "person", zoneId: "z_store" });
     const p = wizardToRule(s, { name: suggestRuleName(s, names) });
     expect(p.name).toBe("אדם נכנס למחסן");
@@ -276,8 +249,13 @@ describe("wizardToRule — required flows", () => {
       schedule: { mode: "custom", from: "22:00", to: "06:00", days: [6, 0, 1, 2, 3] },
     });
     expect(wizardToRule(s).conditions.schedule).toEqual({ from: "22:00", to: "06:00", days: [6, 0, 1, 2, 3] });
-    const tpl = applyTemplate(state({ method: "template" }), "person_after_hours");
-    expect(wizardToRule({ ...tpl, zoneId: "z_full" }).conditions.schedule).toEqual({ from: "22:00", to: "06:00" });
+    const overnight = state({
+      action: "detected",
+      object: "person",
+      zoneId: "z_full",
+      schedule: { mode: "custom", from: "22:00", to: "06:00", days: null },
+    });
+    expect(wizardToRule(overnight).conditions.schedule).toEqual({ from: "22:00", to: "06:00" });
   });
 
   it("outcome: create_event always, push only when notify is on", () => {
@@ -419,9 +397,16 @@ describe("preview", () => {
     expect(ruleSentence(r as Rule, names)).toBe('כאשר משאית חוצה את "שער כניסה" בכיוון כניסה במצלמת "שער ראשי" — צור אירוע.');
   });
 
-  it("template titles map to the preview without extra questions", () => {
-    const tpl = TEMPLATE_BY_ID.vehicle_count;
-    const s = { ...applyTemplate(state({ method: "template" }), tpl.id), lineId: "l_gate" };
+  it("count threshold preview reads as a natural sentence", () => {
+    const s = state({
+      action: "count",
+      object: "vehicle",
+      countMode: "line",
+      lineId: "l_gate",
+      countThresholdEnabled: true,
+      countThreshold: 5,
+      countWindowSeconds: 600,
+    });
     expect(describeRule(previewRule(s) as Rule, names).when).toBe('לפחות 5 רכבים חוצים את "שער כניסה" בתוך 10 דקות');
   });
 });

@@ -12,6 +12,17 @@ export function LoadingBlock() {
   );
 }
 
+/** Subtle skeleton placeholders — prefer over full-screen spinners. */
+export function SkeletonBlock({ rows = 3, className = "" }: { rows?: number; className?: string }) {
+  return (
+    <div className={`space-y-3 ${className}`} aria-busy data-testid="skeleton-block">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/80" />
+      ))}
+    </div>
+  );
+}
+
 export function EmptyBlock({
   message,
   hint,

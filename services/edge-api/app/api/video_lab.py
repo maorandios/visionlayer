@@ -166,20 +166,15 @@ def _clear_tracker_factory(request: Request):
     return clear_tracker
 
 
-@router.post("/assets/{asset_id}/analyze")
-async def analyze_asset(
-    asset_id: str,
+async def start_analysis_for_asset(
+    *,
     request: Request,
-    wait: bool = Query(
-        default=False,
-        description="If true, block until analysis completes (tests). UI should poll.",
-    ),
-    _user: CurrentUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession,
+    asset_id: str,
+    wait: bool = False,
 ) -> dict[str, Any]:
-    _require_video_lab()
+    """Shared orchestration used by Video Lab analyze and Camera AI Test."""
     settings = get_settings()
-    # Automated tests expect a completed job in one response.
     block = wait or settings.environment.lower() in {"test"}
 
     publish_and_collect = await _publish_factory(request, db)
@@ -274,6 +269,21 @@ async def analyze_asset(
 
     asyncio.create_task(_background())
     return video_lab.job_to_dict(job)
+
+
+@router.post("/assets/{asset_id}/analyze")
+async def analyze_asset(
+    asset_id: str,
+    request: Request,
+    wait: bool = Query(
+        default=False,
+        description="If true, block until analysis completes (tests). UI should poll.",
+    ),
+    _user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    _require_video_lab()
+    return await start_analysis_for_asset(request=request, db=db, asset_id=asset_id, wait=wait)
 
 
 @router.get("/jobs/{job_id}")

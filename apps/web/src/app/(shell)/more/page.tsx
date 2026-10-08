@@ -8,7 +8,7 @@ import { Chip } from "@/components/ui/Chip";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { t } from "@/i18n/he";
-import { NAV_SETTINGS, availableDevTools } from "@/lib/navigation";
+import { NAV_SETTINGS, NAV_SYSTEM_STATUS, availableDevTools } from "@/lib/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 
 function NavRow({
@@ -51,6 +51,7 @@ export default function MorePage() {
       <section>
         <SectionHeader title={t("productSection")} />
         <div className="space-y-2">
+          <NavRow href={NAV_SYSTEM_STATUS.href} label={NAV_SYSTEM_STATUS.label} icon={NAV_SYSTEM_STATUS.icon} />
           <NavRow href={NAV_SETTINGS.href} label={NAV_SETTINGS.label} icon={NAV_SETTINGS.icon} />
         </div>
       </section>

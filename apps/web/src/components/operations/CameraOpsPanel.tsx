@@ -4,6 +4,7 @@ import { ArrowRight, MoreVertical } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ActivityPanel } from "@/components/operations/ActivityPanel";
+import { CameraAiTestBar } from "@/components/operations/CameraAiTestBar";
 import { EventDetailView } from "@/components/events/EventDetailView";
 import { EventTimeline } from "@/components/events/EventTimeline";
 import { RulesList } from "@/components/rules/RulesList";
@@ -15,10 +16,11 @@ import { Input } from "@/components/ui/Input";
 import { Tabs } from "@/components/ui/Tabs";
 import { t } from "@/i18n/he";
 import { api } from "@/lib/api";
+import { cameraCapabilities } from "@/lib/camera-capabilities";
 import { cameraStatusHe } from "@/lib/format";
 import type { OpsTab } from "@/components/operations/ops-url";
 import { OPS_TABS } from "@/components/operations/ops-url";
-import type { Camera, Line, Rule, Zone } from "@/lib/types";
+import type { Camera, CameraAiTestStatus, Line, Rule, Zone } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { isVirtualCamera, useCatalog } from "@/providers/CatalogProvider";
 import { useEvents } from "@/providers/EventsProvider";
@@ -82,10 +84,20 @@ export function CameraOpsPanel({
   const router = useRouter();
   const { token } = useAuth();
   const { ruleName, ruleNames, zoneName, refresh: refreshCatalog } = useCatalog();
-  const { events } = useEvents();
+  const { events, refresh: refreshEvents } = useEvents();
   const { showToast } = useToast();
   const virtualCam = isVirtualCamera(camera);
-  const cameraEvents = useMemo(() => events.filter((e) => e.camera_id === camera.id), [events, camera.id]);
+  const caps = cameraCapabilities(camera);
+  const [aiStatus, setAiStatus] = useState<CameraAiTestStatus | null>(null);
+  const [aiRefreshKey, setAiRefreshKey] = useState(0);
+  const latestRunId = aiStatus?.latest_successful_run?.id ?? null;
+
+  const cameraEvents = useMemo(() => {
+    const forCam = events.filter((e) => e.camera_id === camera.id);
+    if (!caps.supportsManualAnalysis) return forCam;
+    if (!latestRunId) return [];
+    return forCam.filter((e) => e.source_analysis_run_id === latestRunId);
+  }, [events, camera.id, caps.supportsManualAnalysis, latestRunId]);
 
   const [view, setView] = useState<PanelView>({ kind: "main" });
   const [menuOpen, setMenuOpen] = useState(false);
@@ -266,7 +278,7 @@ export function CameraOpsPanel({
             />
             {camera.enabled ? cameraStatusHe(camera.status) : t("disabled")}
           </span>
-          {virtualCam ? <Chip tone="dashed">{t("devSourceBadge")}</Chip> : null}
+          {caps.isTestSource ? <Chip tone="dashed">{t("testSourceBadge")}</Chip> : null}
           <div className="relative ms-auto" ref={menuRef}>
             <button
               type="button"
@@ -315,6 +327,22 @@ export function CameraOpsPanel({
         {camera.location ? <p className="text-sm text-ink-muted">{camera.location}</p> : null}
       </div>
 
+      {caps.supportsManualAnalysis ? (
+        <div className="shrink-0">
+          <CameraAiTestBar
+            cameraId={camera.id}
+            onNeedMetric={() => onTabChange("activity")}
+            onNeedRule={() => setView({ kind: "rule-create" })}
+            onStatus={setAiStatus}
+            onRunComplete={() => {
+              setAiRefreshKey((k) => k + 1);
+              void refreshEvents();
+              void onDataChanged?.();
+            }}
+          />
+        </div>
+      ) : null}
+
       <div className="shrink-0">
         <Tabs
           items={OPS_TABS}
@@ -329,21 +357,35 @@ export function CameraOpsPanel({
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2">
         {tab === "activity" ? (
           <ActivityPanel
+            key={`activity-${latestRunId ?? "none"}-${aiRefreshKey}`}
             cameraId={camera.id}
             virtualCam={virtualCam}
             zones={zones}
             lines={lines}
             zoneName={zoneName}
             onCatalogRefresh={() => void refreshCatalog()}
+            analysisRunId={caps.supportsManualAnalysis ? latestRunId : null}
+            awaitingAiTest={caps.supportsManualAnalysis && !latestRunId}
           />
         ) : null}
 
         {tab === "events" ? (
           <div className="space-y-3" data-testid="camera-tab-events">
             <EventTimeline
+              key={`events-${latestRunId ?? "none"}-${aiRefreshKey}`}
               events={cameraEvents}
-              emptyMessage={t("noEventsForCamera")}
-              emptyHint={t("eventsEmptyHintCamera")}
+              emptyMessage={
+                caps.supportsManualAnalysis && !latestRunId
+                  ? t("aiTestEventsEmpty")
+                  : caps.supportsManualAnalysis && latestRunId
+                    ? t("aiTestEventsNoneThisRun")
+                    : t("noEventsForCamera")
+              }
+              emptyHint={
+                caps.supportsManualAnalysis && !latestRunId
+                  ? t("aiTestActivityEmptyHint")
+                  : t("eventsEmptyHintCamera")
+              }
               emptyAction={
                 <Button variant="secondary" size="sm" onClick={() => onTabChange("rules")}>
                   {t("goToRules")}

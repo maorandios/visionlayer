@@ -222,6 +222,22 @@ async def list_runs_for_asset(session: AsyncSession, asset_id: str) -> list[Vide
     return list(result.scalars().all())
 
 
+async def latest_successful_run_for_camera(
+    session: AsyncSession, camera_id: str
+) -> VideoAnalysisRun | None:
+    """Latest completed Benchmark Run for a camera (user-facing Activity/Events scope)."""
+    result = await session.execute(
+        select(VideoAnalysisRun)
+        .where(
+            VideoAnalysisRun.camera_id == camera_id,
+            VideoAnalysisRun.status == "completed",
+        )
+        .order_by(VideoAnalysisRun.analyzed_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def set_track_review(
     session: AsyncSession,
     *,

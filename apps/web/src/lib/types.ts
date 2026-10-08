@@ -24,6 +24,39 @@ export type Camera = {
   updated_at: string;
 };
 
+/** GET /api/v1/cameras/{id}/ai-test */
+export type CameraAiTestStatus = {
+  supports_manual_analysis: boolean;
+  asset_id: string | null;
+  has_rules_or_metrics: boolean;
+  active_job: {
+    id: string;
+    status: string;
+    progress?: {
+      percent?: number;
+      frames_done?: number;
+      frames_total?: number;
+      phase_he?: string;
+    } | null;
+    error_he?: string | null;
+  } | null;
+  latest_job: {
+    id: string;
+    status: string;
+    error_he?: string | null;
+    finished_at?: string | null;
+  } | null;
+  latest_successful_run: {
+    id: string;
+    analyzed_at: string | null;
+    events_total: number;
+    analysis_time_seconds: number;
+    video_duration_sec: number;
+    status: string;
+  } | null;
+  config_changed_since_last_run: boolean;
+};
+
 export type Zone = {
   id: string;
   camera_id: string;

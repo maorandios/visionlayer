@@ -15,7 +15,16 @@ import cv2
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.models import Camera, Event, Line, Rule, VideoLabAsset, VideoLabJob, Zone
+from app.adapters.models import (
+    Camera,
+    Event,
+    Line,
+    MetricDefinition,
+    Rule,
+    VideoLabAsset,
+    VideoLabJob,
+    Zone,
+)
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFoundError, ValidationAppError
 from app.domain.video_lab import analysis_lock, benchmark_store
@@ -181,6 +190,27 @@ async def get_asset(session: AsyncSession, asset_id: str) -> VideoLabAsset:
     return asset
 
 
+async def get_asset_by_camera_id(session: AsyncSession, camera_id: str) -> VideoLabAsset | None:
+    """Return the Video Lab asset backing a test-video camera, if any."""
+    result = await session.execute(
+        select(VideoLabAsset)
+        .where(VideoLabAsset.camera_id == camera_id)
+        .order_by(VideoLabAsset.created_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def require_analyzable_asset(session: AsyncSession, camera_id: str) -> VideoLabAsset:
+    asset = await get_asset_by_camera_id(session, camera_id)
+    if asset is None:
+        raise ValidationAppError("מקור הסרטון אינו זמין")
+    path = Path(asset.stored_path)
+    if not path.is_file():
+        raise ValidationAppError("מקור הסרטון אינו זמין")
+    return asset
+
+
 async def get_job(session: AsyncSession, job_id: str) -> VideoLabJob:
     job = await session.get(VideoLabJob, job_id)
     if job is None:
@@ -254,8 +284,12 @@ async def create_running_job(session: AsyncSession, *, asset_id: str) -> VideoLa
     return job
 
 
-def _target_classes_for_camera(rules: list[Any], camera_id: str) -> list[str]:
-    """Collect enabled rule object classes scoped to this virtual camera."""
+def _target_classes_for_camera(
+    rules: list[Any],
+    camera_id: str,
+    metric_defs: list[Any] | None = None,
+) -> list[str]:
+    """Collect object classes from enabled Rules and Metric Definitions for this camera."""
     found: set[str] = set()
     for rule in rules:
         if not rule.enabled:
@@ -265,6 +299,15 @@ def _target_classes_for_camera(rules: list[Any], camera_id: str) -> list[str]:
         if rule_camera and rule_camera != camera_id:
             continue
         for cls in conditions.get("object_classes") or []:
+            name = str(cls).strip()
+            if name:
+                found.add(name)
+    for md in metric_defs or []:
+        if getattr(md, "camera_id", None) != camera_id:
+            continue
+        if not getattr(md, "enabled", True):
+            continue
+        for cls in list(getattr(md, "object_classes_json", None) or []):
             name = str(cls).strip()
             if name:
                 found.add(name)
@@ -310,10 +353,14 @@ async def run_analysis(
     try:
         rules_result = await session.execute(select(Rule))
         all_rules = list(rules_result.scalars().all())
-        target_classes = _target_classes_for_camera(all_rules, asset.camera_id)
+        metrics_result = await session.execute(
+            select(MetricDefinition).where(MetricDefinition.camera_id == asset.camera_id)
+        )
+        metric_defs = list(metrics_result.scalars().all())
+        target_classes = _target_classes_for_camera(all_rules, asset.camera_id, metric_defs)
         if not target_classes:
             raise ValidationAppError(
-                "אין חוק פעיל למצלמה זו. צרו חוק עם סוג האובייקט לחיפוש לפני הרצת ניתוח AI."
+                "עדיין לא הוגדרו מדדים או חוקים. הוסיפו לפחות מדד או חוק כדי לבדוק את ניתוח ה־AI."
             )
 
         _, _, frames_dir, models, results_dir = _repo_paths()

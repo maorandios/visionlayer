@@ -8,6 +8,7 @@
  * Mobile bottom nav is limited to 5 items; Settings + Dev live under "עוד".
  */
 import {
+  Activity,
   BarChart3,
   Camera,
   FlaskConical,
@@ -34,13 +35,25 @@ export const NAV_EVENTS: NavItem = { href: "/events", label: "אירועים", i
 export const NAV_RULES: NavItem = { href: "/rules", label: "חוקים ואוטומציות", icon: Workflow };
 export const NAV_INSIGHTS: NavItem = { href: "/insights", label: "תובנות", icon: BarChart3 };
 export const NAV_SETTINGS: NavItem = { href: "/settings", label: "הגדרות", icon: Settings };
+export const NAV_SYSTEM_STATUS: NavItem = {
+  href: "/system-status",
+  label: "מצב המערכת",
+  icon: Activity,
+};
 export const NAV_MORE: NavItem = { href: "/more", label: "עוד", icon: MoreHorizontal };
 
 /** Mobile bottom navigation — max 5 items. */
 export const MOBILE_NAV: NavItem[] = [NAV_CAMERAS, NAV_EVENTS, NAV_RULES, NAV_INSIGHTS, NAV_MORE];
 
 /** Global drawer / desktop menu — product areas (no permanent sidebar). */
-export const DRAWER_NAV: NavItem[] = [NAV_CAMERAS, NAV_EVENTS, NAV_RULES, NAV_INSIGHTS, NAV_SETTINGS];
+export const DRAWER_NAV: NavItem[] = [
+  NAV_CAMERAS,
+  NAV_EVENTS,
+  NAV_RULES,
+  NAV_INSIGHTS,
+  NAV_SYSTEM_STATUS,
+  NAV_SETTINGS,
+];
 
 /** @deprecated use DRAWER_NAV — kept as alias for transitional imports. */
 export const DESKTOP_NAV = DRAWER_NAV;
@@ -101,6 +114,7 @@ export function isMoreActive(pathname: string): boolean {
   return (
     isNavActive(NAV_MORE, pathname) ||
     isNavActive(NAV_SETTINGS, pathname) ||
+    isNavActive(NAV_SYSTEM_STATUS, pathname) ||
     pathname.startsWith("/dev/")
   );
 }

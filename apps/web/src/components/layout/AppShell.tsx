@@ -1,11 +1,14 @@
 "use client";
 
-import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { DrawerMenu } from "@/components/layout/DrawerMenu";
 import { TopBar } from "@/components/layout/TopBar";
 import { ToastHost } from "@/components/ui/ToastHost";
+import { fetchSystemHealth, type HealthLevel } from "@/lib/system-health";
+import { isSetupComplete } from "@/lib/setup-storage";
+import { useAuth } from "@/providers/AuthProvider";
 import { useCatalog } from "@/providers/CatalogProvider";
 import { useEvents } from "@/providers/EventsProvider";
 
@@ -20,24 +23,52 @@ function isConstrainedRoute(pathname: string | null): boolean {
   if (!pathname) return true;
   if (pathname === "/" || pathname === "/cameras") return false;
   if (pathname.startsWith("/cameras/")) return false;
+  if (pathname === "/setup") return false;
   return true;
 }
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const search = useSearchParams();
+  const router = useRouter();
   const focus = isFocusRoute(pathname);
   const constrained = isConstrainedRoute(pathname);
   const cameraFocus = (pathname === "/" || pathname === "/cameras") && Boolean(search.get("camera"));
   const [menuOpen, setMenuOpen] = useState(false);
-  const { cameras } = useCatalog();
+  const { token, hub } = useAuth();
+  const { cameras, loading: catalogLoading } = useCatalog();
   const { events } = useEvents();
+  const [systemLevel, setSystemLevel] = useState<HealthLevel>("ok");
 
-  /** True unless at least one camera is explicitly disabled. Empty/loading ≠ "partial". */
-  const systemActive = useMemo(() => {
-    if (cameras.length === 0) return true;
-    return cameras.every((c) => c.enabled);
-  }, [cameras]);
+  /** First-run: empty catalog + setup not done → /setup (once). */
+  useEffect(() => {
+    if (catalogLoading) return;
+    if (pathname === "/setup" || pathname?.startsWith("/login")) return;
+    if (cameras.length > 0) return;
+    if (isSetupComplete()) return;
+    router.replace("/setup");
+  }, [catalogLoading, cameras.length, pathname, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await fetchSystemHealth(token, hub);
+        if (!cancelled) setSystemLevel(snap.level);
+      } catch {
+        if (!cancelled) setSystemLevel("down");
+      }
+    })();
+    const id = window.setInterval(() => {
+      void fetchSystemHealth(token, hub).then((snap) => {
+        if (!cancelled) setSystemLevel(snap.level);
+      });
+    }, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [token, hub, cameras.length]);
 
   const newEvents = useMemo(
     () => events.filter((e) => e.state === "new" && !e.source_analysis_run_id).length,
@@ -55,7 +86,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="ops-ambient flex h-dvh flex-col overflow-hidden" data-testid="ops-shell">
-      <TopBar systemActive={systemActive} newEvents={newEvents} onOpenMenu={() => setMenuOpen(true)} />
+      <TopBar systemLevel={systemLevel} newEvents={newEvents} onOpenMenu={() => setMenuOpen(true)} />
       <DrawerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main
         className={

@@ -18,8 +18,6 @@ export type WizardContextValue = {
   /** Registers a zone / line created inline so it is selectable immediately. */
   addZone: (zone: Zone) => void;
   addLine: (line: Line) => void;
-  /** Whether push notifications are available in this installation. */
-  notifyAvailable: boolean;
   isEdit: boolean;
 };
 

@@ -9,8 +9,8 @@ import { ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
 import { RulePreviewBar, RulePreviewPanel } from "@/components/rules/wizard/RulePreview";
 import { StepPlace } from "@/components/rules/wizard/StepPlace";
 import { StepReview, SuccessScreen } from "@/components/rules/wizard/StepReview";
-import { StepAction, StepCamera, StepCountMode, StepMethod, StepObject, StepTemplate } from "@/components/rules/wizard/steps-choose";
-import { StepConditions, StepDetails, StepOutcome } from "@/components/rules/wizard/steps-details";
+import { StepAction, StepCamera, StepCountMode, StepObject } from "@/components/rules/wizard/steps-choose";
+import { StepConditions, StepDetails } from "@/components/rules/wizard/steps-details";
 import { WizardContext, type WizardContextValue } from "@/components/rules/wizard/wizard-context";
 import { api } from "@/lib/api";
 import { defaultDirectionLabel, describeRule, whenWithCamera, type RuleNames } from "@/lib/rule-describe";
@@ -62,15 +62,12 @@ export type RuleWizardProps = {
 
 const STEP_COMPONENT: Record<Exclude<StepId, "review">, () => React.JSX.Element> = {
   camera: StepCamera,
-  method: StepMethod,
-  template: StepTemplate,
-  action: StepAction,
   object: StepObject,
+  action: StepAction,
   count_mode: StepCountMode,
   place: StepPlace,
   details: StepDetails,
   conditions: StepConditions,
-  outcome: StepOutcome,
 };
 
 export function RuleWizard({
@@ -83,7 +80,7 @@ export function RuleWizard({
   onExit,
   onSaved,
 }: RuleWizardProps) {
-  const { token, hub } = useAuth();
+  const { token } = useAuth();
   const router = useRouter();
   const { refresh: refreshCatalog } = useCatalog();
 
@@ -126,13 +123,15 @@ export function RuleWizard({
         if (rule) {
           const w = ruleToWizard(rule, { zones: allZones });
           setState(w);
-          // Editing opens on the summary; every earlier step is one tap away in the progress bar.
-          setStepIndex(Math.max(0, computeSteps(w).filter((s) => s !== "method").length - 1));
+          // Editing opens on the summary.
+          setStepIndex(Math.max(0, computeSteps(w).length - 1));
         } else {
           const presetObject = presetObjectClass ? objectForClasses([presetObjectClass]) : null;
           const cameraId = presetCameraId && cams.some((c) => c.id === presetCameraId) ? presetCameraId : null;
-          setState({ ...DEFAULT_WIZARD_STATE, cameraId, object: presetObject });
-          setStepIndex(cameraId ? 1 : 0);
+          const initial = { ...DEFAULT_WIZARD_STATE, cameraId, object: presetObject };
+          setState(initial);
+          // Camera-scoped create skips camera step via computeSteps (no cameraId → camera first).
+          setStepIndex(0);
         }
         setLoading(false);
       } catch (e) {
@@ -171,20 +170,13 @@ export function RuleWizard({
     setState((s) => ({ ...s, ...patch }));
   }, []);
 
-  // Editing never asks "how to start" again — the rule already exists.
-  const steps = useMemo(
-    () => computeSteps(state).filter((s) => !(mode === "edit" && s === "method")),
-    [state, mode],
-  );
-  const safeIndex = Math.min(stepIndex, steps.length - 1);
-  const step = steps[safeIndex];
+  const steps = useMemo(() => computeSteps(state), [state]);
+  const safeIndex = Math.min(stepIndex, Math.max(0, steps.length - 1));
+  const step = steps[safeIndex] ?? "object";
   const group: StepGroup = STEP_GROUP_OF[step];
-  // All groups are shown up front so the user sees the whole journey; "הגדרה" disappears only once
-  // it is known that the chosen rule needs no spatial / detail questions.
-  const visibleGroups = STEP_GROUPS.filter(
-    (g) => g.id !== "setup" || !state.action || steps.some((s) => STEP_GROUP_OF[s] === "setup"),
-  );
-  const groupIndex = visibleGroups.findIndex((g) => g.id === group);
+  // Hide groups that are not in the current path (e.g. skip "מקום" when not needed; skip camera when scoped).
+  const visibleGroups = STEP_GROUPS.filter((g) => steps.some((s) => STEP_GROUP_OF[s] === g.id));
+  const groupIndex = Math.max(0, visibleGroups.findIndex((g) => g.id === group));
 
   const choose = useCallback(
     (patch: Partial<RuleWizardState>) => {
@@ -192,16 +184,14 @@ export function RuleWizard({
       setSaveErrors([]);
       const next = { ...state, ...patch };
       setState(next);
-      const nextSteps = computeSteps(next).filter((st) => !(mode === "edit" && st === "method"));
+      const nextSteps = computeSteps(next);
       if (step && !stepError(next, step)) {
         const idx = nextSteps.indexOf(step);
         setStepIndex(Math.min((idx >= 0 ? idx : safeIndex) + 1, nextSteps.length - 1));
       }
     },
-    [mode, state, step, safeIndex],
+    [state, step, safeIndex],
   );
-
-  const notifyAvailable = hub?.features?.web_push === true || hub?.features?.push_notifications === true;
 
   const ctx: WizardContextValue = {
     state,
@@ -214,7 +204,6 @@ export function RuleWizard({
     names,
     addZone: (z) => setZones((prev) => (prev.some((x) => x.id === z.id) ? prev : [...prev, z])),
     addLine: (l) => setLines((prev) => (prev.some((x) => x.id === l.id) ? prev : [...prev, l])),
-    notifyAvailable,
     isEdit: mode === "edit",
   };
 
@@ -272,7 +261,8 @@ export function RuleWizard({
     try {
       let working = state;
       let effectiveNames = names;
-      if (state.action === "detected" && state.cameraId) {
+      // Detected + no zone → resolve/create full-frame zone. Detected + zone → keep selected zone.
+      if (state.action === "detected" && state.cameraId && !state.zoneId) {
         let ff = findFullFrameZone(zones, state.cameraId);
         if (!ff) {
           ff = await api.zones.create(token, state.cameraId, {
@@ -285,11 +275,14 @@ export function RuleWizard({
         }
         const ffId = ff.id;
         working = { ...state, zoneId: ffId };
-        // `names` is memoised from the previous render; make sure the fresh zone reads as full-frame.
         effectiveNames = { ...names, isFullFrameZone: (id) => id === ffId || Boolean(names.isFullFrameZone?.(id)) };
       }
       const name = working.name.trim() || suggestRuleName(working, effectiveNames) || "חוק חדש";
-      const payload = wizardToRule(working, { name });
+      // New Rules never expose notification; preserve legacy notify only when already set on the Rule.
+      const payload = wizardToRule(
+        { ...working, outcome: { createEvent: true, notify: mode === "edit" ? working.outcome.notify : false } },
+        { name },
+      );
       const body = payload as unknown as Record<string, unknown>;
       const remote = await api.rules.validate(token, body);
       if (!remote.valid) {
@@ -316,7 +309,7 @@ export function RuleWizard({
     setSaveErrors([]);
     setError(null);
     setState({ ...DEFAULT_WIZARD_STATE, cameraId: state.cameraId });
-    setStepIndex(state.cameraId ? 1 : 0);
+    setStepIndex(0);
   }
 
   // ---- render
@@ -442,11 +435,11 @@ export function RuleWizard({
             >
               <Button variant="ghost" onClick={goBack}>
                 <ArrowRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                {safeIndex === 0 ? "ביטול" : isReview ? "חזור לעריכה" : "חזרה"}
+                {safeIndex === 0 ? "ביטול" : isReview ? "חזרה לעריכה" : "חזרה"}
               </Button>
               {isReview ? (
                 <Button onClick={() => void save()} disabled={saving} data-testid="wizard-save">
-                  {saving ? "שומר…" : mode === "edit" ? "שמור שינויים" : "שמור והפעל"}
+                  {saving ? "שומר…" : mode === "edit" ? "שמור שינויים" : "צור חוק"}
                 </Button>
               ) : (
                 <Button onClick={goNext} data-testid="wizard-next">

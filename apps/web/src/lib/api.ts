@@ -88,6 +88,14 @@ export const api = {
     return request<HubInfo>("/");
   },
 
+  health() {
+    return request<{ status: string; service?: string; version?: string }>("/health");
+  },
+
+  ready() {
+    return request<{ status: string; checks?: { database?: boolean } }>("/ready");
+  },
+
   login(username: string, password: string) {
     return request<{ access_token: string; token_type: string }>(
       "/api/v1/auth/login",
@@ -139,6 +147,18 @@ export const api = {
     },
     disable(token: string, id: string) {
       return request<Camera>(`/api/v1/cameras/${id}/disable`, { method: "POST" }, token);
+    },
+    aiTest(token: string, id: string) {
+      return request<{
+        run_id: string;
+        job_id: string;
+        status: string;
+        asset_id: string;
+        progress?: Record<string, unknown>;
+      }>(`/api/v1/cameras/${id}/ai-test`, { method: "POST" }, token);
+    },
+    aiTestStatus(token: string, id: string) {
+      return request<import("@/lib/types").CameraAiTestStatus>(`/api/v1/cameras/${id}/ai-test`, {}, token);
     },
   },
 

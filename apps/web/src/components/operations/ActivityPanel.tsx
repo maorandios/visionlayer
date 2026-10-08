@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { EmptyBlock, LoadingBlock } from "@/components/ui/StateBlock";
+import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
 import { BarChart } from "@/components/ui/BarChart";
 import { Card } from "@/components/ui/Card";
 import { t } from "@/i18n/he";
@@ -31,6 +31,11 @@ type Props = {
   lines: Line[];
   zoneName: (id: string | null | undefined) => string;
   onCatalogRefresh?: () => void;
+  /** For test-video cameras: scope widgets to latest successful AI Test run. */
+  analysisRunId?: string | null;
+  /** True while we know supportsManualAnalysis but no successful run yet. */
+  awaitingAiTest?: boolean;
+  onStartAiTest?: () => void;
 };
 
 type PanelMode =
@@ -47,6 +52,9 @@ export function ActivityPanel({
   zones,
   lines,
   onCatalogRefresh,
+  analysisRunId = null,
+  awaitingAiTest = false,
+  onStartAiTest,
 }: Props) {
   const { token } = useAuth();
   const [range, setRange] = useState<RangeKey>("today");
@@ -54,6 +62,7 @@ export function ActivityPanel({
   const [summaries, setSummaries] = useState<Record<string, MetricsSummary | null>>({});
   const [series, setSeries] = useState<Record<string, MetricsTimeseries | null>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [mode, setMode] = useState<PanelMode>({ kind: "main" });
   const [toast, setToast] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<MetricDefinition | null>(null);
@@ -62,6 +71,7 @@ export function ActivityPanel({
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const defs = await api.metricDefinitions.list(token, cameraId);
       setDefinitions(defs);
@@ -75,7 +85,11 @@ export function ActivityPanel({
           const filters = {
             scope: (virtualCam ? "video_lab" : "production") as "video_lab" | "production",
             camera_id: cameraId,
-            ...(virtualCam ? {} : rangeFor(range)),
+            ...(virtualCam
+              ? analysisRunId
+                ? { analysis_run_id: analysisRunId }
+                : {}
+              : rangeFor(range)),
             ...filtersForDefinition(def),
           };
           try {
@@ -102,10 +116,11 @@ export function ActivityPanel({
       setSeries(nextSeries);
     } catch {
       setDefinitions([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
-  }, [token, cameraId, virtualCam, range]);
+  }, [token, cameraId, virtualCam, range, analysisRunId]);
 
   useEffect(() => {
     void load();
@@ -177,6 +192,14 @@ export function ActivityPanel({
 
   if (loading) return <LoadingBlock />;
 
+  if (loadError) {
+    return (
+      <div className="space-y-4" data-testid="camera-tab-activity">
+        <ErrorBlock message={t("activityLoadError")} onRetry={load} />
+      </div>
+    );
+  }
+
   if (definitions.length === 0) {
     return (
       <div className="space-y-4" data-testid="camera-tab-activity">
@@ -188,6 +211,24 @@ export function ActivityPanel({
               <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
               {t("activityFirstMetricCta")}
             </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (virtualCam && awaitingAiTest && !analysisRunId) {
+    return (
+      <div className="space-y-4" data-testid="camera-tab-activity">
+        <EmptyBlock
+          message={t("aiTestActivityEmpty")}
+          hint={t("aiTestActivityEmptyHint")}
+          action={
+            onStartAiTest ? (
+              <Button onClick={onStartAiTest} data-testid="activity-ai-test-cta">
+                {t("aiTestCta")}
+              </Button>
+            ) : undefined
           }
         />
       </div>

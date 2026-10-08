@@ -1,11 +1,12 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { EventTimeline } from "@/components/events/EventTimeline";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ErrorBlock, LoadingBlock } from "@/components/ui/StateBlock";
 import { t } from "@/i18n/he";
+import { scopeEventsToLatestTestRuns } from "@/lib/events-run-scope";
 import { useCatalog } from "@/providers/CatalogProvider";
 import { useEvents } from "@/providers/EventsProvider";
 
@@ -15,8 +16,9 @@ function EventsInner() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const labReturn = returnTo && returnTo.startsWith("/dev/video-lab") ? returnTo : null;
+  const scoped = useMemo(() => scopeEventsToLatestTestRuns(events), [events]);
 
-  if (error) return <ErrorBlock message={error} onRetry={refresh} />;
+  if (error) return <ErrorBlock message={t("eventsLoadError")} onRetry={refresh} />;
 
   return (
     <div className="space-y-4">
@@ -29,10 +31,10 @@ function EventsInner() {
         }
       />
       <EventTimeline
-        events={events}
+        events={scoped}
         loading={loading}
         emptyMessage={t("emptyEvents")}
-        emptyHint={t("eventsEmptyHint")}
+        emptyHint={t("eventsEmptyHintCamera")}
         showCamera
         cameraName={cameraName}
         ruleName={ruleName}

@@ -19,7 +19,7 @@ export function StepReview({ errors }: { errors: string[] }) {
 
   return (
     <div className="space-y-5" data-testid="wizard-review">
-      <StepTitle title={isEdit ? "בדקו את החוק" : "החוק מוכן"} hint="בדקו שהכול נכון, ואז שמרו." />
+      <StepTitle title="סיכום החוק" hint={isEdit ? "בדקו שהכול נכון, ואז שמרו." : "בדקו שהכול נכון, ואז צרו את החוק."} />
 
       <div className="overflow-hidden rounded-lg border border-border bg-surface">
         <CameraSnapshot

@@ -4,7 +4,7 @@
  *   RuleWizardState  ──wizardToRule──►  Rule payload (conditions / actions)   ← source of truth
  *   Rule             ──ruleToWizard──►  RuleWizardState (+ legacy notes for things the wizard can't edit)
  */
-import { OBJECT_BY_ID, TEMPLATE_BY_ID, VEHICLE_CLASSES, objectForClasses, verb } from "@/lib/rule-wizard/config";
+import { OBJECT_BY_ID, VEHICLE_CLASSES, objectForClasses, verb } from "@/lib/rule-wizard/config";
 import { DEFAULT_WIZARD_STATE, type LegacyInfo, type RuleWizardState, type WizardActionId } from "@/lib/rule-wizard/types";
 import { objectClassHe } from "@/lib/format";
 import type { Rule, RuleAction, RuleConditions, Zone } from "@/lib/types";
@@ -49,24 +49,6 @@ export function isFullFrameZone(zone: Pick<Zone, "points"> | null | undefined): 
 
 export function findFullFrameZone(zones: Zone[], cameraId: string): Zone | null {
   return zones.find((z) => z.camera_id === cameraId && isFullFrameZone(z)) ?? null;
-}
-
-// ---------------------------------------------------------------------------
-// Template application
-// ---------------------------------------------------------------------------
-
-export function applyTemplate(state: RuleWizardState, templateId: string): RuleWizardState {
-  const tpl = TEMPLATE_BY_ID[templateId];
-  if (!tpl) return { ...state, templateId };
-  return {
-    ...state,
-    ...tpl.preset,
-    method: "template",
-    templateId,
-    // spatial selections depend on the camera, not the template
-    zoneId: state.zoneId,
-    lineId: state.lineId,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -289,8 +271,6 @@ export function ruleToWizard(rule: Rule, opts: RuleToWizardOptions = {}): RuleWi
   return {
     ...DEFAULT_WIZARD_STATE,
     cameraId: c.camera_id ?? null,
-    method: "custom",
-    templateId: null,
     action,
     object,
     zoneId: c.zone_id ?? null,

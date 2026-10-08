@@ -1,8 +1,15 @@
 /**
- * Central configuration for the Rule Wizard: actions, objects, capability mapping, templates.
+ * Central configuration for the Rule Wizard: actions, objects, capability mapping.
  * All conditional behaviour of the wizard derives from this file.
+ * Object availability is driven by the shared VisionCapabilities registry.
  */
-import type { CountMode, RuleWizardState, WizardActionId, WizardObjectId } from "@/lib/rule-wizard/types";
+import type { CountMode, WizardActionId, WizardObjectId } from "@/lib/rule-wizard/types";
+import {
+  OBJECT_TYPES,
+  OBJECT_TYPE_LABELS,
+  OBJECT_TYPE_TO_CLASSES,
+  type VisionObjectType,
+} from "@/lib/vision-capabilities";
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -58,7 +65,7 @@ export const ACTIONS: ActionDef[] = [
   },
   {
     id: "dwell",
-    label: "נשאר באזור",
+    label: "נשאר באזור זמן מסוים",
     description: "אובייקט נשאר באזור למשך זמן שהוגדר.",
     icon: "Timer",
     requires: { zone: true, duration: true },
@@ -72,8 +79,8 @@ export const ACTIONS: ActionDef[] = [
   },
   {
     id: "count",
-    label: "ספירת אובייקטים",
-    description: "ספור אובייקטים שמבצעים פעולה מסוימת.",
+    label: "הכמות עברה סף",
+    description: "צור אירוע כשמגיעים לכמות מסוימת באזור או בקו.",
     icon: "Hash",
     requires: { countMode: true },
   },
@@ -84,9 +91,9 @@ export const ACTION_BY_ID: Record<WizardActionId, ActionDef> = Object.fromEntrie
 ) as Record<WizardActionId, ActionDef>;
 
 export const COUNT_MODES: { id: CountMode; label: string; description: string }[] = [
-  { id: "zone", label: "כאשר נכנס לאזור", description: "כל כניסה לאזור נספרת פעם אחת." },
-  { id: "zone_exit", label: "כאשר יוצא מאזור", description: "כל יציאה מהאזור נספרת פעם אחת." },
-  { id: "line", label: "כאשר חוצה קו", description: "כל חצייה של הקו נספרת פעם אחת." },
+  { id: "zone", label: "באזור (כניסות)", description: "ספירת כניסות לאזור שנבחר." },
+  { id: "zone_exit", label: "באזור (יציאות)", description: "ספירת יציאות מאזור שנבחר." },
+  { id: "line", label: "בחציית קו", description: "ספירת חציות של קו שנבחר." },
 ];
 
 /** Effective spatial requirement, taking the count mode into account. */
@@ -127,15 +134,36 @@ export type ObjectDef = {
 
 export const VEHICLE_CLASSES = ["car", "truck", "bus", "motorcycle"];
 
-export const OBJECTS: ObjectDef[] = [
-  { id: "person", label: "אדם", plural: "אנשים", gender: "m", pluralGender: "m", classes: ["person"], icon: "User" },
-  { id: "vehicle", label: "רכב", plural: "רכבים", gender: "m", pluralGender: "m", classes: VEHICLE_CLASSES, icon: "Car" },
-  { id: "car", label: "מכונית", plural: "מכוניות", gender: "f", pluralGender: "f", classes: ["car"], icon: "Car" },
-  { id: "truck", label: "משאית", plural: "משאיות", gender: "f", pluralGender: "f", classes: ["truck"], icon: "Truck" },
-  { id: "motorcycle", label: "אופנוע", plural: "אופנועים", gender: "m", pluralGender: "m", classes: ["motorcycle"], icon: "Bike" },
-  { id: "bicycle", label: "אופניים", plural: "אופניים", gender: "m", pluralGender: "m", classes: ["bicycle"], icon: "Bike" },
-  { id: "bus", label: "אוטובוס", plural: "אוטובוסים", gender: "m", pluralGender: "m", classes: ["bus"], icon: "Bus" },
-];
+const OBJECT_ICON: Record<VisionObjectType, ObjectDef["icon"]> = {
+  person: "User",
+  vehicle: "Car",
+  car: "Car",
+  truck: "Truck",
+  motorcycle: "Bike",
+  bicycle: "Bike",
+  bus: "Bus",
+};
+
+const OBJECT_PLURAL: Record<VisionObjectType, { plural: string; gender: Gender; pluralGender: Gender }> = {
+  person: { plural: "אנשים", gender: "m", pluralGender: "m" },
+  vehicle: { plural: "רכבים", gender: "m", pluralGender: "m" },
+  car: { plural: "מכוניות", gender: "f", pluralGender: "f" },
+  truck: { plural: "משאיות", gender: "f", pluralGender: "f" },
+  motorcycle: { plural: "אופנועים", gender: "m", pluralGender: "m" },
+  bicycle: { plural: "אופניים", gender: "m", pluralGender: "m" },
+  bus: { plural: "אוטובוסים", gender: "m", pluralGender: "m" },
+};
+
+/** Object cards — order and classes from shared VisionCapabilities. */
+export const OBJECTS: ObjectDef[] = OBJECT_TYPES.map((id) => ({
+  id,
+  label: OBJECT_TYPE_LABELS[id],
+  plural: OBJECT_PLURAL[id].plural,
+  gender: OBJECT_PLURAL[id].gender,
+  pluralGender: OBJECT_PLURAL[id].pluralGender,
+  classes: [...OBJECT_TYPE_TO_CLASSES[id]],
+  icon: OBJECT_ICON[id],
+}));
 
 /** Hebrew verb forms used in rule sentences, by grammatical gender. */
 export const VERBS = {
@@ -255,148 +283,3 @@ export const WEEKDAYS: { value: number; label: string; short: string }[] = [
   { value: 4, label: "שישי", short: "ו׳" },
   { value: 5, label: "שבת", short: "ש׳" },
 ];
-
-// ---------------------------------------------------------------------------
-// Templates — a template is just a preconfigured partial wizard state.
-// ---------------------------------------------------------------------------
-
-export type TemplateCategory = "security" | "vehicles" | "operations";
-
-export type TemplateDef = {
-  id: string;
-  category: TemplateCategory;
-  title: string;
-  description: string;
-  icon: ActionDef["icon"] | ObjectDef["icon"] | "ShieldAlert" | "Moon" | "Users";
-  preset: Partial<RuleWizardState>;
-};
-
-export const TEMPLATE_CATEGORIES: { id: TemplateCategory; label: string }[] = [
-  { id: "security", label: "אבטחה" },
-  { id: "vehicles", label: "רכבים" },
-  { id: "operations", label: "תפעול" },
-];
-
-export const TEMPLATES: TemplateDef[] = [
-  // --- אבטחה
-  {
-    id: "person_enter",
-    category: "security",
-    title: "אדם נכנס לאזור",
-    description: "צור אירוע בכל פעם שאדם נכנס לאזור שתגדיר.",
-    icon: "LogIn",
-    preset: { action: "zone_enter", object: "person" },
-  },
-  {
-    id: "person_forbidden",
-    category: "security",
-    title: "אדם נמצא באזור אסור",
-    description: "צור אירוע כשאדם נמצא בתוך אזור שאסור להימצא בו.",
-    icon: "ShieldAlert",
-    preset: { action: "zone_presence", object: "person" },
-  },
-  {
-    id: "person_dwell",
-    category: "security",
-    title: "אדם נשאר באזור זמן ממושך",
-    description: "צור אירוע כשאדם נשאר באזור יותר מדקה.",
-    icon: "Timer",
-    preset: { action: "dwell", object: "person", durationSeconds: 60 },
-  },
-  {
-    id: "person_after_hours",
-    category: "security",
-    title: "אדם מזוהה בשעות סגירה",
-    description: "צור אירוע כשאדם מופיע במצלמה בין 22:00 ל־06:00.",
-    icon: "Moon",
-    preset: {
-      action: "detected",
-      object: "person",
-      schedule: { mode: "custom", from: "22:00", to: "06:00", days: null },
-    },
-  },
-  // --- רכבים
-  {
-    id: "vehicle_enter",
-    category: "vehicles",
-    title: "רכב נכנס",
-    description: "צור אירוע בכל פעם שרכב נכנס לאזור שתגדיר.",
-    icon: "LogIn",
-    preset: { action: "zone_enter", object: "vehicle" },
-  },
-  {
-    id: "vehicle_exit",
-    category: "vehicles",
-    title: "רכב יוצא",
-    description: "צור אירוע בכל פעם שרכב יוצא מאזור שתגדיר.",
-    icon: "LogOut",
-    preset: { action: "zone_exit", object: "vehicle" },
-  },
-  {
-    id: "truck_enter",
-    category: "vehicles",
-    title: "משאית נכנסת",
-    description: "צור אירוע בכל פעם שמשאית עוברת דרך שער שהגדרת.",
-    icon: "Truck",
-    preset: { action: "line_cross", object: "truck" },
-  },
-  {
-    id: "vehicle_cross_gate",
-    category: "vehicles",
-    title: "רכב חוצה שער",
-    description: "צור אירוע בכל פעם שרכב חוצה קו שתסמן על התמונה.",
-    icon: "ArrowLeftRight",
-    preset: { action: "line_cross", object: "vehicle" },
-  },
-  {
-    id: "vehicle_count",
-    category: "vehicles",
-    title: "ספירת רכבים",
-    description: "ספור רכבים שחוצים שער, וצור אירוע כשמגיעים לכמות.",
-    icon: "Hash",
-    preset: { action: "count", object: "vehicle", countMode: "line", countThresholdEnabled: true },
-  },
-  // --- תפעול
-  {
-    id: "people_count",
-    category: "operations",
-    title: "ספירת אנשים",
-    description: "ספור אנשים שנכנסים לאזור, וצור אירוע כשמגיעים לכמות.",
-    icon: "Users",
-    preset: { action: "count", object: "person", countMode: "zone", countThresholdEnabled: true },
-  },
-  {
-    id: "truck_count",
-    category: "operations",
-    title: "ספירת משאיות",
-    description: "ספור משאיות שחוצות שער, וצור אירוע כשמגיעים לכמות.",
-    icon: "Truck",
-    preset: { action: "count", object: "truck", countMode: "line", countThresholdEnabled: true },
-  },
-  {
-    id: "zone_occupancy",
-    category: "operations",
-    title: "תפוסת אזור",
-    description: "צור אירוע כשיותר מדי אנשים נכנסים לאזור בפרק זמן קצר.",
-    icon: "MapPin",
-    preset: {
-      action: "count",
-      object: "person",
-      countMode: "zone",
-      countThresholdEnabled: true,
-      countThreshold: 10,
-      countWindowSeconds: 600,
-    },
-  },
-];
-
-export const TEMPLATE_BY_ID: Record<string, TemplateDef> = Object.fromEntries(TEMPLATES.map((t) => [t.id, t]));
-
-/** Which wizard questions a template already answers (those steps are skipped). */
-export function templateDefines(template: TemplateDef): { action: boolean; object: boolean; countMode: boolean } {
-  return {
-    action: template.preset.action != null,
-    object: template.preset.object != null,
-    countMode: template.preset.countMode != null,
-  };
-}

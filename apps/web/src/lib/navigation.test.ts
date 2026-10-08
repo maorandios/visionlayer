@@ -21,12 +21,13 @@ describe("navigation model", () => {
     expect(MOBILE_NAV.map((i) => i.label)).toEqual(["מצלמות", "אירועים", "חוקים ואוטומציות", "תובנות", "עוד"]);
   });
 
-  it("drawer lists product areas, with no dev tools mixed in", () => {
+  it("drawer lists product areas including system status, with no dev tools mixed in", () => {
     expect(DRAWER_NAV.map((i) => i.label)).toEqual([
       "מצלמות",
       "אירועים",
       "חוקים ואוטומציות",
       "תובנות",
+      "מצב המערכת",
       "הגדרות",
     ]);
     expect(DRAWER_NAV.some((i) => i.href.startsWith("/dev/"))).toBe(false);

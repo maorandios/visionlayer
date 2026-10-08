@@ -20,10 +20,9 @@ describe("cameras / operations UI", () => {
     expect(OPS_TABS.map((t) => t.label)).toEqual(["פעילות", "אירועים", "חוקים"]);
   });
 
-  it("new camera page posts create and returns to ops focus", () => {
+  it("new camera page uses the Add Camera wizard", () => {
     const src = readFileSync(resolve(__dirname, "new/page.tsx"), "utf8");
-    expect(src).toContain("api.cameras.create");
-    expect(src).toContain("/?camera=");
+    expect(src).toContain("AddCameraWizard");
   });
 
   it("legacy detail route redirects into the operations workspace", () => {
