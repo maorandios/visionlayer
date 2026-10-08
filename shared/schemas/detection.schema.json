@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://visionlayer.local/schemas/detection.schema.json",
   "title": "DetectionEvent",
-  "description": "Unified detection contract emitted by every VisionAdapter backend.",
+  "description": "Unified detection contract emitted by every Vision backend through services/vision/boundary.py. Product Logic must not depend on detector-native IDs or runtime types.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -31,7 +31,7 @@
     "class": {
       "type": "string",
       "minLength": 1,
-      "description": "Object class label from the active model (person, car, truck, ...)."
+      "description": "VisionLayer canonical class name (person, car, truck, bus, motorcycle, bicycle). Never a numeric detector id."
     },
     "confidence": {
       "type": "number",
@@ -40,29 +40,41 @@
     },
     "bbox": {
       "type": "array",
-      "description": "Pixel bounding box [x1, y1, x2, y2].",
+      "description": "Pixel bounding box [x1, y1, x2, y2] in full original frame coordinates (not letterboxed inference surfaces).",
       "minItems": 4,
       "maxItems": 4,
       "items": { "type": "number" }
     },
     "track_id": {
       "type": ["integer", "null"],
-      "minimum": 0
+      "minimum": 0,
+      "description": "Stable tracker identity within the current camera stream/run. Not a persistent real-world identity."
     },
     "timestamp": {
       "type": "number",
-      "description": "Unix timestamp in seconds (fractional allowed)."
+      "description": "Absolute Unix timestamp in seconds (fractional allowed). AI Test: base_unix_ts + video_timestamp_sec."
+    },
+    "video_timestamp_sec": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Seconds from the start of the source video (media timeline). Distinct from absolute timestamp."
+    },
+    "frame_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0-based frame ordinal in the source video. Used by Event Media seeking on file sources."
     },
     "frame_size": {
       "type": "array",
-      "description": "Frame size [width, height] in pixels.",
+      "description": "Original frame size [width, height] in pixels.",
       "minItems": 2,
       "maxItems": 2,
       "items": { "type": "integer", "minimum": 1 }
     },
     "source": {
       "type": "string",
-      "enum": ["mock", "dev", "deepstream", "hailo", "development_video"]
+      "enum": ["mock", "dev", "deepstream", "hailo", "development_video"],
+      "description": "Vision backend identity."
     }
   }
 }

@@ -63,6 +63,15 @@ _DETECTOR_CONFIDENCE = {
     },
 }
 
+from app.domain.video_lab.debug_config import (
+    DEBUG_CONF_THRESHOLD,
+    DEBUG_DETECTOR_CONFIDENCE,
+    DEBUG_FRAME_STRIDE,
+    DEBUG_SCORE_THRESHOLD,
+    DEBUG_SEARCH_CLASSES,
+)
+
+
 def _repo_paths() -> tuple[Path, Path, Path, Path, Path]:
     """Return (vision_root, videos_dir, frames_dir, models_dir, results_dir)."""
     edge_api = Path(__file__).resolve().parents[3]
@@ -114,7 +123,7 @@ async def create_asset_from_upload(
     location: str | None,
 ) -> VideoLabAsset:
     _ensure_vision_path()
-    from lab_api import VideoValidationError, probe_video, validate_upload
+    from boundary import VideoValidationError, probe_video, validate_upload
 
     try:
         validate_upload(filename=filename, size_bytes=len(content))
@@ -322,8 +331,18 @@ async def run_analysis(
     clear_tracker: ClearTrackerFn,
     prefer_onnx: bool = True,
     job: VideoLabJob | None = None,
+    debug_mode: bool = False,
+    test_start_datetime: str | None = None,
+    expected_results: dict[str, Any] | None = None,
 ) -> VideoLabJob:
-    """Run analysis for an asset. Creates a job unless one is provided."""
+    """Run analysis for an asset. Creates a job unless one is provided.
+
+    When debug_mode=True (AI Test correctness mode):
+    - frame_stride = 1
+    - lower uniform detection threshold
+    - detect all VisionLayer-supported classes
+    - persist a full debug bundle alongside product summary
+    """
     asset = await get_asset(session, asset_id)
     owns_lock = False
     if job is None:
@@ -340,7 +359,8 @@ async def run_analysis(
             owns_lock = True
 
     _ensure_vision_path()
-    from lab_api import get_vision_runtime_config, resolve_model_order, run_video_lab_analysis
+    # Official Vision boundary (development backend: YOLOX + ByteTrack internally).
+    from boundary import analyze_uploaded_video, get_vision_runtime_config, resolve_model_order
 
     clear_tracker(asset.camera_id)
     event_ids: list[str] = []
@@ -363,6 +383,16 @@ async def run_analysis(
                 "עדיין לא הוגדרו מדדים או חוקים. הוסיפו לפחות מדד או חוק כדי לבדוק את ניתוח ה־AI."
             )
 
+        # Correctness mode: search all supported classes so failures are attributable
+        # to mapping / spatial / metric / rule logic rather than early class filtering.
+        search_classes = list(DEBUG_SEARCH_CLASSES) if debug_mode else target_classes
+        det_conf = float(DEBUG_CONF_THRESHOLD) if debug_mode else None
+        det_score = float(DEBUG_SCORE_THRESHOLD) if debug_mode else None
+        uniform_thr = bool(debug_mode)
+        detector_confidence_snap = (
+            dict(DEBUG_DETECTOR_CONFIDENCE) if debug_mode else dict(_DETECTOR_CONFIDENCE)
+        )
+
         _, _, frames_dir, models, results_dir = _repo_paths()
         runtime = get_vision_runtime_config()
         model_path = None
@@ -376,7 +406,8 @@ async def run_analysis(
         use_onnx = prefer_onnx and model_path is not None and not force_scripted
 
         job_id = job.id
-        targets_he = ", ".join(class_he(c) for c in target_classes)
+        targets_he = ", ".join(class_he(c) for c in search_classes)
+        mode_label = "מצב בדיקת דיוק · " if debug_mode else ""
 
         def _on_progress(done: int, total: int, phase_he: str) -> None:
             total = max(1, int(total))
@@ -395,19 +426,26 @@ async def run_analysis(
         set_progress(
             job_id,
             percent=1,
-            phase_he=f"טוען מודל · יחפש: {targets_he}",
+            phase_he=f"{mode_label}טוען מודל · יחפש: {targets_he}",
             frames_total=int(asset.frame_count or 0),
         )
 
+        effective_stride = (
+            DEBUG_FRAME_STRIDE if debug_mode else int(runtime.frame_stride)
+        )
+
         result = await asyncio.to_thread(
-            lambda: run_video_lab_analysis(
+            lambda: analyze_uploaded_video(
                 video_path=asset.stored_path,
                 camera_id=asset.camera_id,
                 prefer_onnx=use_onnx,
                 model_path=model_path if use_onnx else None,
                 on_progress=_on_progress,
-                target_classes=target_classes,
-                frame_stride=runtime.frame_stride,
+                target_classes=search_classes,
+                frame_stride=effective_stride,
+                conf_threshold=det_conf,
+                score_threshold=det_score,
+                uniform_threshold=uniform_thr,
             )
         )
 
@@ -550,7 +588,7 @@ async def run_analysis(
             detector_model=model_label if not model_path else Path(str(model_path)).name,
             tracker_name=str(result.metrics.tracker_name),
             frame_stride=int(result.metrics.frame_stride),
-            detector_confidence=dict(_DETECTOR_CONFIDENCE),
+            detector_confidence=detector_confidence_snap,
             detections_total=int(result.metrics.detections_count),
             detections_by_class=detections_by_class,
             unique_tracks_total=int(result.metrics.unique_tracks),
@@ -562,7 +600,15 @@ async def run_analysis(
                 "onnx_used": use_onnx,
                 "model_path": str(model_path) if model_path else None,
                 "runtime_config": result.metrics.runtime_config or runtime.to_dict(),
-                "search_classes": target_classes,
+                "search_classes": search_classes,
+                "metric_rule_classes": target_classes,
+                "debug_mode": debug_mode,
+                "correctness_mode": debug_mode,
+                "detection_threshold": det_conf
+                if det_conf is not None
+                else _DETECTOR_CONFIDENCE["conf_threshold"],
+                "test_start_datetime": test_start_datetime,
+                "expected": expected_results,
             },
         )
         reviews = await benchmark_store.get_run_reviews(session, benchmark_run.id)
@@ -589,12 +635,50 @@ async def run_analysis(
             )
         )
 
+        from app.domain.video_lab.debug_bundle import build_debug_bundle
+
+        overlay_payload = [
+            {
+                "frame_index": o.frame_index,
+                "timestamp_sec": o.timestamp_sec,
+                "boxes": o.boxes,
+            }
+            for o in result.overlays
+        ]
+        debug_payload = build_debug_bundle(
+            run_id=benchmark_run.id,
+            camera_id=asset.camera_id,
+            asset=asset,
+            rules=rules,
+            metric_defs=metric_defs,
+            zones=zones,
+            lines=lines,
+            detections=result.detections,
+            overlays=overlay_payload,
+            base_unix_ts=result.base_unix_ts,
+            frame_stride=int(result.metrics.frame_stride),
+            detection_threshold=float(
+                det_conf if det_conf is not None else _DETECTOR_CONFIDENCE["conf_threshold"]
+            ),
+            frames_read=int(result.metrics.frames_read or 0),
+            frames_analyzed=detector_frames,
+            triggered_rule_ids=rules_triggered,
+            event_rows=event_rows,
+            event_ids=event_ids,
+            hits=hits,
+            search_classes=search_classes,
+            correctness_mode=debug_mode,
+            test_start_datetime=test_start_datetime,
+            expected=expected_results,
+        )
+
         summary = {
             "message_he": "ניתוח הושלם",
             "guidance_he": guidance_he,
             "objects_he": objects_he,
-            "search_classes": target_classes,
-            "search_classes_he": [class_he(c) for c in target_classes],
+            "search_classes": search_classes,
+            "search_classes_he": [class_he(c) for c in search_classes],
+            "metric_rule_classes": target_classes,
             "class_counts": detections_by_class,
             "unique_tracks_by_class": unique_by_class,
             "first_seen_by_class": first_seen,
@@ -615,6 +699,9 @@ async def run_analysis(
             "base_unix_ts": result.base_unix_ts,
             "benchmark_run_id": benchmark_run.id,
             "benchmark": benchmark_payload,
+            "debug_mode": debug_mode,
+            "correctness_mode": debug_mode,
+            "debug": debug_payload,
         }
         metrics = {
             "video_duration_sec": result.metrics.video_duration_sec,
@@ -657,14 +744,7 @@ async def run_analysis(
         job.status = "completed"
         job.metrics_json = metrics
         job.summary_json = summary
-        job.overlays_json = [
-            {
-                "frame_index": o.frame_index,
-                "timestamp_sec": o.timestamp_sec,
-                "boxes": o.boxes,
-            }
-            for o in result.overlays
-        ]
+        job.overlays_json = overlay_payload
         job.timeline_json = focus_timeline
         job.event_ids_json = event_ids
         job.finished_at = datetime.now(UTC)

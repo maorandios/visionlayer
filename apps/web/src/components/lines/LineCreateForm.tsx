@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { LineEditor } from "@/components/lines/LineEditor";
 import type { Point } from "@/lib/polygon";
 import { api } from "@/lib/api";
@@ -17,11 +16,11 @@ type Props = {
   compact?: boolean;
 };
 
+/** Standalone line create — geometry + name only; rules/metrics set crossing direction later. */
 export function LineCreateForm({ cameraId, onDone, compact = false }: Props) {
   const { token } = useAuth();
   const [name, setName] = useState("");
   const [points, setPoints] = useState<Point[]>([]);
-  const [direction, setDirection] = useState<"any" | "a_to_b" | "b_to_a">("any");
   const [enabled, setEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -50,13 +49,17 @@ export function LineCreateForm({ cameraId, onDone, compact = false }: Props) {
       setError("נדרשות בדיוק שתי נקודות לקו");
       return;
     }
+    if (!name.trim()) {
+      setError("תנו לקו שם");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
       await api.lines.create(token, cameraId, {
-        name,
+        name: name.trim(),
         points,
-        direction,
+        direction: "any",
         enabled,
       });
       onDone();
@@ -73,20 +76,12 @@ export function LineCreateForm({ cameraId, onDone, compact = false }: Props) {
       <Card className="space-y-4">
         <div>
           <label className="mb-1 block text-xs text-ink-muted">{t("lineName")}</label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">{t("directionLabel")}</label>
-          <Select
-            value={direction}
-            onChange={(e) => setDirection(e.target.value as "any" | "a_to_b" | "b_to_a")}
-          >
-            <option value="any">כל כיוון</option>
-            <option value="a_to_b">כניסה (A→B)</option>
-            <option value="b_to_a">יציאה (B→A)</option>
-          </Select>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder='למשל "שער כניסה"' />
         </div>
         <LineEditor points={points} onChange={setPoints} backgroundImageUrl={bgUrl} />
+        <p className="text-xs text-ink-muted">
+          כיוון המעבר (כניסה / יציאה / חצייה) יוגדר בחוק או במדד — לא כאן.
+        </p>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
           {t("enabled")}

@@ -1,6 +1,7 @@
 /**
- * Central VisionLayer capability registry (POC: RF-DETR Large class set).
- * Keep in sync with services/edge-api/app/domain/vision_capabilities.py
+ * Frontend mirror of VisionLayer product object types.
+ * Authoritative backend SSOT: services/edge-api/app/domain/vision_capabilities.py
+ * Keep vehicle group and object lists identical — do not invent parallel maps.
  */
 
 export const OBJECT_TYPES = [

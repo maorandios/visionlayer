@@ -1,7 +1,11 @@
-"""VisionAdapter contract — hardware-agnostic interface for all vision backends.
+"""VisionAdapter protocol — stream-oriented companion to the official Vision boundary.
+
+Product Layer must use ``services/vision/boundary.py`` for analysis entrypoints.
+Stream backends (future DeepStream/Hailo process) should implement this Protocol
+and still emit Unified Detection dicts (``detection_contract``).
 
 Product Layer (edge-api) must never import DeepStream, TensorRT, HailoRT, or CUDA.
-Only adapters under services/vision may touch hardware SDKs (Phase 11).
+Only adapters under services/vision may touch hardware SDKs.
 """
 
 from __future__ import annotations

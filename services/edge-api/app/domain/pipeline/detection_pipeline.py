@@ -361,6 +361,8 @@ class DetectionPipeline:
                         state="new",
                         message_he=match.message_he,
                         payload_json=payload,
+                        # Run ownership is fixed at create time (not during Event Media).
+                        source_analysis_run_id=analysis_run_id,
                     )
                     session.add(event)
                     rule_row = rule_row_by_id.get(match.rule_id)

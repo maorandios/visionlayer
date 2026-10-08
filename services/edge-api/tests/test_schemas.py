@@ -37,6 +37,8 @@ def test_detection_schema_accepts_valid_payload() -> None:
         "track_id": 42,
         "timestamp": 1728123456.123,
         "frame_size": [1920, 1080],
+        "frame_index": 10,
+        "video_timestamp_sec": 0.4,
         "source": "mock",
     }
     _validator("detection.schema.json").validate(payload)

@@ -22,7 +22,7 @@ function ev(partial: Partial<EventItem> & { id: string; camera_id: string }): Ev
 }
 
 describe("scopeEventsToLatestTestRuns", () => {
-  it("keeps only the newest analysis_run_id per test camera", () => {
+  it("keeps only the newest analysis_run_id per test camera (feed fallback)", () => {
     const list = [
       ev({ id: "e3", camera_id: "vcam_1", source_analysis_run_id: "run_b" }),
       ev({ id: "e2", camera_id: "vcam_1", source_analysis_run_id: "run_a" }),
@@ -31,5 +31,16 @@ describe("scopeEventsToLatestTestRuns", () => {
     ];
     const scoped = scopeEventsToLatestTestRuns(list);
     expect(scoped.map((e) => e.id)).toEqual(["e3", "p1"]);
+  });
+
+  it("uses authoritative latest_successful_run map when provided", () => {
+    const list = [
+      ev({ id: "e3", camera_id: "vcam_1", source_analysis_run_id: "run_b" }),
+      ev({ id: "e2", camera_id: "vcam_1", source_analysis_run_id: "run_a" }),
+      ev({ id: "p1", camera_id: "cam_1" }),
+    ];
+    // Authoritative latest is run_a even if feed shows run_b first.
+    const scoped = scopeEventsToLatestTestRuns(list, { vcam_1: "run_a" });
+    expect(scoped.map((e) => e.id)).toEqual(["e2", "p1"]);
   });
 });

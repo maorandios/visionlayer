@@ -10,6 +10,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from detection_contract import ALLOWED_SOURCES, build_detection
 from detectors.base import ObjectDetector
 from pipeline.track_results import build_track_gallery, fragmentation_hints
 from runtime_config import apply_opencv_thread_limit, get_vision_runtime_config
@@ -155,36 +156,39 @@ def analyze_video(
             track_ids.add(tr.track_id)
             class_counter[tr.class_name] += 1
             tracks_by_class.setdefault(tr.class_name, set()).add(tr.track_id)
-            # CRITICAL: video timeline, not wall clock
-            ts = base + float(packet.timestamp_sec)
-            det = {
-                "type": "detection",
-                "schema_version": "1.0",
-                "camera_id": cam_id,
-                "class": tr.class_name,
-                "confidence": round(float(tr.confidence), 4),
-                "bbox": [float(x) for x in tr.bbox],
-                "track_id": int(tr.track_id),
-                "timestamp": ts,
-                "frame_size": [int(packet.width), int(packet.height)],
-                "source": source_label,
-            }
-            detections.append(det)
-            # Gallery observations are UI-only — not part of Detection contract
-            gallery_obs.append(
-                {
-                    **det,
-                    "frame_index": int(packet.frame_index),
-                }
+            # Absolute time = base_unix_ts + media-relative seconds (not wall clock).
+            video_t = float(packet.timestamp_sec)
+            ts = base + video_t
+            src = source_label if source_label in ALLOWED_SOURCES else "development_video"
+            det = build_detection(
+                camera_id=cam_id,
+                class_name=tr.class_name,
+                confidence=round(float(tr.confidence), 4),
+                bbox=[float(x) for x in tr.bbox],
+                timestamp=ts,
+                source=src,
+                track_id=int(tr.track_id),
+                frame_size=(int(packet.width), int(packet.height)),
+                frame_index=int(packet.frame_index),
+                video_timestamp_sec=video_t,
             )
+            detections.append(det)
+            gallery_obs.append(dict(det))
             if on_detection is not None:
                 on_detection(det)
+            bbox_list = [float(x) for x in tr.bbox]
+            # Spatial anchor = bottom-center (same point used for zone/line evaluation).
+            anchor_px = [
+                round((bbox_list[0] + bbox_list[2]) / 2.0, 2),
+                round(bbox_list[3], 2),
+            ]
             frame_boxes.append(
                 {
                     "track_id": tr.track_id,
                     "class": tr.class_name,
                     "confidence": tr.confidence,
-                    "bbox": list(tr.bbox),
+                    "bbox": bbox_list,
+                    "anchor_px": anchor_px,
                 }
             )
             timeline.append(

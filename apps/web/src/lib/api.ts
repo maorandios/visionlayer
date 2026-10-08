@@ -410,6 +410,27 @@ export const api = {
     getRun(token: string, runId: string) {
       return request<import("@/lib/types").BenchmarkRun>(`/api/v1/video-lab/runs/${runId}`, {}, token);
     },
+    latestSuccessfulRuns(token: string) {
+      return request<{ by_camera: Record<string, string> }>(
+        `/api/v1/video-lab/latest-successful-runs`,
+        {},
+        token,
+      );
+    },
+
+    getRunDebug(token: string, runId: string) {
+      return request<{
+        run_id: string;
+        job_id: string;
+        asset_id: string;
+        camera_id: string;
+        debug_mode: boolean;
+        debug: import("@/lib/types").AiTestDebugBundle;
+        events_created?: number;
+        hits?: unknown[];
+        rule_checks?: unknown[];
+      }>(`/api/v1/video-lab/runs/${runId}/debug`, {}, token);
+    },
     setTrackReview(
       token: string,
       runId: string,

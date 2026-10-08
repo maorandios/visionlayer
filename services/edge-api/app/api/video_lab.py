@@ -172,6 +172,9 @@ async def start_analysis_for_asset(
     db: AsyncSession,
     asset_id: str,
     wait: bool = False,
+    debug_mode: bool = False,
+    test_start_datetime: str | None = None,
+    expected_results: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Shared orchestration used by Video Lab analyze and Camera AI Test."""
     settings = get_settings()
@@ -187,6 +190,9 @@ async def start_analysis_for_asset(
             publish_and_collect=publish_and_collect,
             clear_tracker=clear_tracker,
             prefer_onnx=True,
+            debug_mode=debug_mode,
+            test_start_datetime=test_start_datetime,
+            expected_results=expected_results,
         )
         return video_lab.job_to_dict(job)
 
@@ -250,6 +256,9 @@ async def start_analysis_for_asset(
                     clear_tracker=clear,
                     prefer_onnx=True,
                     job=running,
+                    debug_mode=debug_mode,
+                    test_start_datetime=test_start_datetime,
+                    expected_results=expected_results,
                 )
         except Exception:
             logger.exception("video_lab_background_failed job=%s", job_id)
@@ -370,6 +379,19 @@ async def list_benchmark_runs(
     return [benchmark_store.run_history_item(r) for r in runs]
 
 
+@router.get("/latest-successful-runs")
+async def list_latest_successful_runs(
+    _user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Authoritative camera_id → latest successful AI Test run id (Events/Activity scope)."""
+    _require_video_lab()
+    from app.domain.video_lab import benchmark_store
+
+    by_camera = await benchmark_store.latest_successful_run_ids_by_camera(db)
+    return {"by_camera": by_camera}
+
+
 @router.get("/runs/{run_id}")
 async def get_benchmark_run(
     run_id: str,
@@ -382,6 +404,36 @@ async def get_benchmark_run(
     run = await benchmark_store.get_run(db, run_id)
     reviews = await benchmark_store.get_run_reviews(db, run_id)
     return benchmark_store.run_to_dict(run, reviews)
+
+
+@router.get("/runs/{run_id}/debug")
+async def get_run_debug(
+    run_id: str,
+    _user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Developer-only AI Test debug bundle for a completed analysis run (same pipeline output)."""
+    _require_video_lab()
+    from app.domain.video_lab import benchmark_store
+
+    run = await benchmark_store.get_run(db, run_id)
+    job = await video_lab.get_job(db, run.job_id)
+    summary = dict(job.summary_json or {})
+    debug = summary.get("debug")
+    if not isinstance(debug, dict):
+        raise NotFoundError("אין נתוני ניתוח (debug) לריצה זו — הריצו מחדש במצב בדיקת דיוק")
+    return {
+        "run_id": run.id,
+        "job_id": job.id,
+        "asset_id": run.asset_id,
+        "camera_id": run.camera_id,
+        "debug_mode": bool(summary.get("debug_mode") or summary.get("correctness_mode")),
+        "debug": debug,
+        # Product layers from the same run (for expected-vs-actual / event markers)
+        "events_created": summary.get("events_created"),
+        "hits": summary.get("hits"),
+        "rule_checks": summary.get("rule_checks"),
+    }
 
 
 @router.patch("/runs/{run_id}/tracks/{track_id}/review")

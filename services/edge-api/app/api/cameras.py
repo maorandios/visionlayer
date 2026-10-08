@@ -295,8 +295,21 @@ async def start_camera_ai_test(
     if active is not None:
         raise ValidationAppError("בדיקת AI כבר מתבצעת למצלמה זו. המתינו לסיומה.")
 
-    payload = await start_analysis_for_asset(request=request, db=db, asset_id=asset.id, wait=False)
-    await _audit(db, actor=user.username, action="ai_test", entity_id=camera_id, payload={"job_id": payload.get("id")})
+    # Manual AI Test always uses correctness/debug mode (stride=1, lower threshold, full traces).
+    payload = await start_analysis_for_asset(
+        request=request,
+        db=db,
+        asset_id=asset.id,
+        wait=False,
+        debug_mode=True,
+    )
+    await _audit(
+        db,
+        actor=user.username,
+        action="ai_test",
+        entity_id=camera_id,
+        payload={"job_id": payload.get("id"), "debug_mode": True},
+    )
     await db.commit()
     return {
         "run_id": payload.get("id"),
@@ -304,6 +317,8 @@ async def start_camera_ai_test(
         "status": payload.get("status"),
         "asset_id": asset.id,
         "progress": payload.get("progress"),
+        "debug_mode": True,
+        "mode_he": "מצב בדיקת דיוק",
     }
 
 

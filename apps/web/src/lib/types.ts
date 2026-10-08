@@ -229,4 +229,5 @@ export type {
   BenchmarkRun,
   BenchmarkHistoryItem,
   TrackReviewStatus,
+  AiTestDebugBundle,
 } from "@/lib/types-video-lab";

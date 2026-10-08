@@ -79,6 +79,8 @@ export const he = {
   aiTestActivityEmptyHint: "הגדר מדדים וחוקים, ואז הרץ את הסרטון כדי לראות את התוצאות.",
   aiTestEventsEmpty: "עדיין אין תוצאות בדיקה",
   aiTestEventsNoneThisRun: "לא נוצרו אירועים בבדיקה הזו",
+  aiTestShowAnalysis: "הצג ניתוח",
+  aiTestCorrectnessMode: "מצב בדיקת דיוק",
   viewAll: "הצג הכל",
 
   // Home

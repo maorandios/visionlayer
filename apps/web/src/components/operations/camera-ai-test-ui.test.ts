@@ -17,7 +17,7 @@ describe("camera AI Test UX", () => {
     const panel = read("components/operations/CameraOpsPanel.tsx");
     expect(panel).toContain("CameraAiTestBar");
     expect(panel).toContain("analysisRunId");
-    expect(panel).toContain("source_analysis_run_id");
+    expect(panel).toContain("scopeEventsToRun");
     expect(panel).toContain("latestRunId");
   });
 

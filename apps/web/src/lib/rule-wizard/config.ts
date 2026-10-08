@@ -8,6 +8,7 @@ import {
   OBJECT_TYPES,
   OBJECT_TYPE_LABELS,
   OBJECT_TYPE_TO_CLASSES,
+  VEHICLE_CLASSES as VEHICLE_CLASSES_SSOT,
   type VisionObjectType,
 } from "@/lib/vision-capabilities";
 
@@ -75,7 +76,7 @@ export const ACTIONS: ActionDef[] = [
     label: "חצה קו",
     description: "אובייקט עבר מצד אחד של קו לצד השני.",
     icon: "ArrowLeftRight",
-    requires: { line: true, direction: true },
+    requires: { line: true },
   },
   {
     id: "count",
@@ -132,7 +133,8 @@ export type ObjectDef = {
   icon: "User" | "Car" | "Truck" | "Bike" | "Bus";
 };
 
-export const VEHICLE_CLASSES = ["car", "truck", "bus", "motorcycle"];
+/** Authoritative vehicle group — re-exported from vision-capabilities SSOT. */
+export const VEHICLE_CLASSES = [...VEHICLE_CLASSES_SSOT];
 
 const OBJECT_ICON: Record<VisionObjectType, ObjectDef["icon"]> = {
   person: "User",

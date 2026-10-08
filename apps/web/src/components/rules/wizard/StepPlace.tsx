@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { LineEditor } from "@/components/lines/LineEditor";
+import { PlaceLineSetup } from "@/components/rules/wizard/PlaceLineSetup";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PolygonEditor } from "@/components/zones/PolygonEditor";
@@ -11,13 +11,13 @@ import { StepTitle, useWizard } from "@/components/rules/wizard/wizard-context";
 import { api } from "@/lib/api";
 import type { Point } from "@/lib/polygon";
 import { spatialRequirement } from "@/lib/rule-wizard/config";
-import type { Line, Zone } from "@/lib/types";
+import type { Zone } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 
 export function StepPlace() {
   const { state } = useWizard();
   const need = spatialRequirement(state.action, state.countMode);
-  if (need === "line") return <PlaceLine />;
+  if (need === "line") return <PlaceLineSetup />;
   if (state.action === "detected") return <PlaceDetected />;
   return <PlaceZone />;
 }
@@ -197,138 +197,6 @@ export function InlineZoneCreator({
       <div className="flex flex-wrap gap-2">
         <Button onClick={save} disabled={saving}>
           שמור אזור והמשך
-        </Button>
-        {onCancel ? (
-          <Button variant="ghost" onClick={onCancel}>
-            ביטול
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Lines
-// ---------------------------------------------------------------------------
-
-function PlaceLine() {
-  const { state, choose, lines } = useWizard();
-  const [creating, setCreating] = useState(false);
-  const list = lines
-    .filter((l) => l.camera_id === state.cameraId && l.enabled)
-    .filter((l, i, arr) => arr.findIndex((x) => x.id === l.id) === i);
-
-  if (creating || list.length === 0) {
-    return (
-      <div className="space-y-4">
-        <StepTitle
-          title={list.length === 0 ? "סמנו את הקו על התמונה" : "קו חדש"}
-          hint="הקישו על שתי נקודות כדי למתוח קו, למשל לרוחב השער."
-        />
-        <InlineLineCreator
-          onCancel={list.length === 0 ? undefined : () => setCreating(false)}
-          onCreated={(line) => {
-            choose({ lineId: line.id });
-            setCreating(false);
-          }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <StepTitle title="איזה קו?" hint="בחרו קו קיים או סמנו קו חדש על התמונה." />
-      <ul className="grid gap-3 sm:grid-cols-2" data-testid="wizard-line-list">
-        {list.map((l) => (
-          <li key={l.id}>
-            <PlaceCard
-              selected={state.lineId === l.id}
-              name={l.name}
-              onClick={() => choose({ lineId: l.id })}
-              preview={<CameraSnapshot cameraId={l.camera_id} line={l} rounded="rounded-none" className="border-0" />}
-              testId="wizard-line-card"
-            />
-          </li>
-        ))}
-        <li>
-          <NewPlaceCard label="קו חדש" onClick={() => setCreating(true)} testId="wizard-line-new" />
-        </li>
-      </ul>
-    </div>
-  );
-}
-
-export function InlineLineCreator({
-  onCreated,
-  onCancel,
-}: {
-  onCreated: (line: Line) => void;
-  onCancel?: () => void;
-}) {
-  const { token } = useAuth();
-  const { state, addLine } = useWizard();
-  const bg = useSnapshotUrl(state.cameraId);
-  const [name, setName] = useState("");
-  const [points, setPoints] = useState<Point[]>([]);
-  const [labelAB, setLabelAB] = useState("כניסה");
-  const [labelBA, setLabelBA] = useState("יציאה");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (!token || !state.cameraId) return;
-    if (points.length !== 2) {
-      setError("סמנו שתי נקודות כדי ליצור קו.");
-      return;
-    }
-    if (!name.trim()) {
-      setError("תנו לקו שם, למשל \"שער כניסה\".");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      const line = await api.lines.create(token, state.cameraId, {
-        name: name.trim(),
-        points,
-        direction: "any",
-        label_a_to_b: labelAB.trim() || null,
-        label_b_to_a: labelBA.trim() || null,
-        enabled: true,
-      });
-      addLine(line);
-      onCreated(line);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "שמירת הקו נכשלה.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="space-y-4" data-testid="wizard-inline-line">
-      <LineEditor points={points} onChange={setPoints} backgroundImageUrl={bg ?? null} />
-      <div>
-        <label className="mb-1 block text-xs text-ink-muted">איך נקרא לקו הזה?</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder='למשל "שער כניסה"' />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">כיוון 1 נקרא</label>
-          <Input value={labelAB} onChange={(e) => setLabelAB(e.target.value)} placeholder="למשל כניסה" />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-ink-muted">כיוון 2 נקרא</label>
-          <Input value={labelBA} onChange={(e) => setLabelBA(e.target.value)} placeholder="למשל יציאה" />
-        </div>
-      </div>
-      <p className="text-xs text-ink-muted">אפשר לתת שמות משמעותיים לכל כיוון, למשל ״חוץ״ ו״פנים״ או ״כניסה״ ו״יציאה״.</p>
-      {error ? <p className="text-sm text-ink">{error}</p> : null}
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={save} disabled={saving}>
-          שמור קו והמשך
         </Button>
         {onCancel ? (
           <Button variant="ghost" onClick={onCancel}>

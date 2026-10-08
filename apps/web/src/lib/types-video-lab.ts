@@ -222,3 +222,63 @@ export type VideoLabJob = {
   finished_at: string | null;
   created_at: string | null;
 };
+
+/** Developer AI Test debug bundle (from same analysis run as product Activity/Events). */
+export type AiTestDebugBundle = {
+  schema_version: string;
+  run_id: string;
+  correctness_mode: boolean;
+  mode_he: string;
+  summary: {
+    run_id: string;
+    video_frames: number;
+    frames_analyzed: number;
+    stride: number;
+    detection_threshold: number;
+    detections: number;
+    confirmed_tracks: number;
+    line_crossings: number;
+    zone_enters: number;
+    zone_exits: number;
+    metric_contributions: number;
+    events_created: number;
+  };
+  funnel: {
+    stages: Array<{ key: string; label_he: string; count: number; detail?: Record<string, number> }>;
+    summary_line: string;
+  };
+  per_class: Array<{
+    class: string;
+    class_he: string;
+    detections: number;
+    tracks: number;
+    confidence_avg: number | null;
+    confidence_min: number | null;
+    confidence_max: number | null;
+  }>;
+  tracks: Array<Record<string, unknown>>;
+  rule_traces: Array<Record<string, unknown>>;
+  metric_traces: Array<Record<string, unknown>>;
+  event_markers: Array<{
+    event_id?: string;
+    video_sec?: number;
+    label_he?: string;
+    rule_id?: string;
+    track_id?: number;
+  }>;
+  overlays: Array<{
+    frame_index: number;
+    timestamp_sec: number;
+    boxes: Array<{
+      track_id: number;
+      class: string;
+      confidence: number;
+      bbox: number[];
+      anchor_px?: number[];
+    }>;
+  }>;
+  config: Record<string, unknown>;
+  expected_vs_actual?: Array<{ label: string; expected: unknown; actual: unknown }> | null;
+  rejection_reason_catalog?: Record<string, string>;
+  rule_checks?: Array<Record<string, unknown>>;
+};

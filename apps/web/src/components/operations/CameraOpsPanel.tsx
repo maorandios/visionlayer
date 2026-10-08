@@ -17,6 +17,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { t } from "@/i18n/he";
 import { api } from "@/lib/api";
 import { cameraCapabilities } from "@/lib/camera-capabilities";
+import { scopeEventsToRun } from "@/lib/events-run-scope";
 import { cameraStatusHe } from "@/lib/format";
 import type { OpsTab } from "@/components/operations/ops-url";
 import { OPS_TABS } from "@/components/operations/ops-url";
@@ -95,8 +96,8 @@ export function CameraOpsPanel({
   const cameraEvents = useMemo(() => {
     const forCam = events.filter((e) => e.camera_id === camera.id);
     if (!caps.supportsManualAnalysis) return forCam;
-    if (!latestRunId) return [];
-    return forCam.filter((e) => e.source_analysis_run_id === latestRunId);
+    // Same authoritative latest_successful_run concept as global Events.
+    return scopeEventsToRun(forCam, camera.id, latestRunId);
   }, [events, camera.id, caps.supportsManualAnalysis, latestRunId]);
 
   const [view, setView] = useState<PanelView>({ kind: "main" });

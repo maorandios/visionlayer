@@ -197,7 +197,13 @@ export function ruleToWizard(rule: Rule, opts: RuleToWizardOptions = {}): RuleWi
   // object
   const classes = c.object_classes ?? [];
   let object = objectForClasses(classes);
-  if (!object && classes.length === 1 && VEHICLE_CLASSES.includes(classes[0])) object = objectForClasses(classes);
+  if (
+    !object &&
+    classes.length === 1 &&
+    (VEHICLE_CLASSES as readonly string[]).includes(classes[0])
+  ) {
+    object = objectForClasses(classes);
+  }
   if (!object) {
     legacy.objectClasses = [...classes];
     notes.push(`סוג האובייקט "${classes.map((x) => objectClassHe(x)).join(", ")}" נשמר כפי שהוא ואינו ניתן לעריכה כאן.`);

@@ -1,4 +1,11 @@
-"""Single public entry for Video Test Lab — Product Layer imports only this module."""
+"""Development vision backend (YOLOX + ByteTrack) — internal to services/vision.
+
+Product Layer (edge-api) should import ``boundary`` (official Vision façade), not
+this module's detector/tracker factories. ``run_video_lab_analysis`` remains as the
+development implementation called by ``boundary.analyze_uploaded_video``.
+
+Deprecated for Product: prefer ``from boundary import analyze_uploaded_video``.
+"""
 
 from __future__ import annotations
 
@@ -26,6 +33,9 @@ def create_detector(
     prefer_onnx: bool = True,
     model_path: Path | str | None = None,
     target_classes: Collection[str] | None = None,
+    conf_threshold: float | None = None,
+    score_threshold: float | None = None,
+    uniform_threshold: bool = False,
 ):
     """Build detector: ONNX YOLOX when available, else scripted (tests/dev fallback)."""
     apply_opencv_thread_limit()
@@ -37,7 +47,14 @@ def create_detector(
     if prefer_onnx:
         try:
             path = Path(model_path) if model_path else None
-            return YoloxOnnxDetector(path, class_filter=class_filter)
+            kwargs: dict[str, Any] = {"class_filter": class_filter}
+            if conf_threshold is not None:
+                kwargs["conf_threshold"] = float(conf_threshold)
+            if score_threshold is not None:
+                kwargs["score_threshold"] = float(score_threshold)
+            if uniform_threshold:
+                kwargs["uniform_threshold"] = True
+            return YoloxOnnxDetector(path, **kwargs)
         except Exception:
             pass
     return ScriptedDetector()
@@ -70,6 +87,9 @@ def run_video_lab_analysis(
     target_classes: Collection[str] | None = None,
     tracker_kind: TrackerKind = "bytetrack",
     tracker_config: TrackerConfig | None = None,
+    conf_threshold: float | None = None,
+    score_threshold: float | None = None,
+    uniform_threshold: bool = False,
 ) -> AnalysisResult:
     apply_opencv_thread_limit()
     runtime = get_vision_runtime_config()
@@ -81,6 +101,9 @@ def run_video_lab_analysis(
         prefer_onnx=prefer_onnx,
         model_path=model_path,
         target_classes=target_classes,
+        conf_threshold=conf_threshold,
+        score_threshold=score_threshold,
+        uniform_threshold=uniform_threshold,
     )
     tracker = create_tracker(
         kind=tracker_kind,
@@ -101,10 +124,18 @@ def run_video_lab_analysis(
     )
 
 
+def analyze_uploaded_video(**kwargs: Any) -> AnalysisResult:
+    """Compatibility alias — delegates to the official Vision boundary."""
+    from boundary import analyze_uploaded_video as _official
+
+    return _official(**kwargs)
+
+
 __all__ = [
     "AnalysisResult",
     "TrackerConfig",
     "VideoValidationError",
+    "analyze_uploaded_video",
     "create_detector",
     "create_tracker",
     "get_vision_runtime_config",

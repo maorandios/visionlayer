@@ -93,7 +93,9 @@ export function defaultLineName(mode: LineMetricMode, existingNames: string[]): 
   return `${base} ${n}`;
 }
 
-export function lineSetupCopy(mode: LineMetricMode): {
+export type LineSetupVariant = "metric" | "rule";
+
+export function lineSetupCopy(mode: LineMetricMode, variant: LineSetupVariant = "metric"): {
   drawTitle: string;
   drawHint: string;
   directionTitle: string;
@@ -102,6 +104,17 @@ export function lineSetupCopy(mode: LineMetricMode): {
   crossingOne: string;
   pickOneTitle: string;
 } {
+  if (variant === "rule" && mode === "crossing") {
+    return {
+      drawTitle: "סמנו את הקו על התמונה",
+      drawHint: "לחצו על שתי נקודות כדי למתוח קו, למשל לרוחב השער.",
+      directionTitle: "מתי החוק יופעל?",
+      directionConfirm: "כיוון המעבר שנבחר",
+      crossingBoth: "בכל חצייה",
+      crossingOne: "כיוון מעבר אחד",
+      pickOneTitle: "לחצו על החץ — באיזה כיוון מעבר יופעל החוק?",
+    };
+  }
   if (mode === "entry") {
     return {
       drawTitle: "סמן את קו הכניסה",
@@ -139,8 +152,15 @@ export function lineSetupSummary(opts: {
   mode: LineMetricMode;
   objectLabel: string;
   direction: MetricDirection | null;
+  variant?: LineSetupVariant;
 }): string {
-  const { mode, objectLabel, direction } = opts;
+  const { mode, objectLabel, direction, variant = "metric" } = opts;
+  if (variant === "rule" && mode === "crossing") {
+    if (direction === "any" || !direction) {
+      return "החוק יופעל בכל פעם שהאובייקט חוצה את הקו.";
+    }
+    return "החוק יופעל כשהאובייקט חוצה את הקו בכיוון המסומן.";
+  }
   if (mode === "entry") {
     return `${objectLabel} שחוצים את הקו בכיוון המסומן ייספרו ככניסה.`;
   }

@@ -117,12 +117,16 @@ describe("computeSteps — universal flow", () => {
     expect(steps).not.toContain("method");
     expect(steps).not.toContain("template");
     expect(steps).not.toContain("outcome");
+    expect(steps).not.toContain("details");
+    expect(steps).toContain("place");
   });
 
   it("gives contextual Hebrew validation messages", () => {
     expect(stepError(state({ cameraId: null }), "camera")).toBe("יש לבחור מצלמה כדי להמשיך.");
     expect(stepError(state({ action: "zone_enter" }), "place")).toBe("יש לבחור אזור כדי להמשיך.");
-    expect(stepError(state({ action: "line_cross" }), "place")).toBe("יש לבחור קו כדי להמשיך.");
+    expect(stepError(state({ action: "line_cross" }), "place")).toBe(
+      "סמנו קו, בחרו כיוון מעבר, ולחצו «שמור והמשך».",
+    );
     expect(stepError(state({ action: "dwell", durationSeconds: 0 }), "details")).toBe("יש להזין זמן שהייה גדול מאפס.");
     expect(stepError(state({ action: "count", countThreshold: 0 }), "details")).toBe("יש להזין כמות של לפחות 1.");
     expect(stepError(state({ schedule: { mode: "custom", from: "08:00", to: "18:00", days: [] } }), "conditions")).toBe(

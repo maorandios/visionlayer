@@ -16,6 +16,7 @@ import {
   lineSetupCopy,
   lineSetupSummary,
   type LineMetricMode,
+  type LineSetupVariant,
   toPixels,
 } from "@/lib/line-direction";
 import type { MetricDirection } from "@/lib/metric-wizard/types";
@@ -51,8 +52,11 @@ type Props = {
   /** Preselect an existing line (edit flow). */
   initialLineId?: string | null;
   initialDirection?: MetricDirection | null;
-  onCancel: () => void;
+  onCancel?: () => void;
   onComplete: (result: LineMetricSetupResult) => void;
+  /** Rule wizard embeds setup — hides redundant back button. */
+  embedded?: boolean;
+  variant?: LineSetupVariant;
 };
 
 function pluralHe(objectType: VisionObjectType): string {
@@ -78,10 +82,12 @@ export function LineMetricSetup({
   initialDirection = null,
   onCancel,
   onComplete,
+  embedded = false,
+  variant = "metric",
 }: Props) {
   const { token } = useAuth();
   const bg = useSnapshotUrl(cameraId);
-  const copy = lineSetupCopy(mode);
+  const copy = lineSetupCopy(mode, variant);
   const objLabel = pluralHe(objectType);
 
   const [phase, setPhase] = useState<Phase>(() => {
@@ -236,7 +242,7 @@ export function LineMetricSetup({
   const summaryText =
     mode === "crossing" && direction === "any"
       ? crossingBothSummary(objLabel)
-      : lineSetupSummary({ mode, objectLabel: objLabel, direction });
+      : lineSetupSummary({ mode, objectLabel: objLabel, direction, variant });
 
   const phaseTitle =
     phase === "choose_source"
@@ -293,9 +299,11 @@ export function LineMetricSetup({
           >
             + צייר קו חדש
           </Button>
-          <Button variant="ghost" className="w-full" onClick={onCancel}>
-            חזרה
-          </Button>
+          {!embedded && onCancel ? (
+            <Button variant="ghost" className="w-full" onClick={onCancel}>
+              חזרה
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -377,7 +385,15 @@ export function LineMetricSetup({
                     const stroke = selected ? "var(--color-accent)" : "rgba(245,240,232,0.35)";
                     const fill = selected ? "var(--color-accent)" : "rgba(245,240,232,0.25)";
                     const label =
-                      mode === "entry" ? "כניסה" : mode === "exit" ? "יציאה" : selected ? "חצייה" : "";
+                      variant === "rule" && selected
+                        ? "מעבר"
+                        : mode === "entry"
+                          ? "כניסה"
+                          : mode === "exit"
+                            ? "יציאה"
+                            : selected
+                              ? "חצייה"
+                              : "";
                     // Arrow shaft + head
                     const dx = ar.tip.x - ar.base.x;
                     const dy = ar.tip.y - ar.base.y;
@@ -487,9 +503,11 @@ export function LineMetricSetup({
           </div>
 
           <div className="flex gap-2 pt-1">
-            <Button variant="ghost" onClick={onCancel}>
-              חזרה
-            </Button>
+            {!embedded && onCancel ? (
+              <Button variant="ghost" onClick={onCancel}>
+                חזרה
+              </Button>
+            ) : null}
             <Button
               className="flex-1"
               disabled={!ready || saving}

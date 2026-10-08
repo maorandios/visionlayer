@@ -7,8 +7,6 @@ import { ChoiceCard, ChoicePill } from "@/components/rules/wizard/ChoiceCard";
 import { StepTitle, useWizard } from "@/components/rules/wizard/wizard-context";
 import { durationShort } from "@/lib/rule-wizard/convert";
 import { DURATION_CHOICES, THRESHOLD_CHOICES, WEEKDAYS, WINDOW_CHOICES, OBJECT_BY_ID } from "@/lib/rule-wizard/config";
-import type { WizardDirection } from "@/lib/rule-wizard/types";
-
 // ---------------------------------------------------------------------------
 // Details: duration / direction / count
 // ---------------------------------------------------------------------------
@@ -17,9 +15,6 @@ export function StepDetails() {
   const { state } = useWizard();
   const blocks: React.ReactNode[] = [];
   if (state.action === "dwell") blocks.push(<DurationBlock key="duration" />);
-  if (state.action === "line_cross" || (state.action === "count" && state.countMode === "line")) {
-    blocks.push(<DirectionBlock key="direction" />);
-  }
   if (state.action === "count") blocks.push(<CountBlock key="count" />);
   if (state.legacy?.presenceDurationSeconds) blocks.push(<LegacyPresenceNote key="legacy" />);
 
@@ -28,9 +23,7 @@ export function StepDetails() {
       ? "כמה זמן צריך להישאר?"
       : state.action === "count"
         ? "ספירה"
-        : state.action === "line_cross"
-          ? "באיזה כיוון?"
-          : "פרטים";
+        : "פרטים";
 
   return (
     <div className="space-y-6">
@@ -76,35 +69,6 @@ function DurationBlock() {
       <p className="text-sm text-ink-muted">
         {`החוק יפעל כש${state.object ? OBJECT_BY_ID[state.object].label : "האובייקט"} נשאר באזור יותר מ־${durationShort(state.durationSeconds || 0)}.`}
       </p>
-    </section>
-  );
-}
-
-function DirectionBlock() {
-  const { state, update, names } = useWizard();
-  const labelFor = (d: WizardDirection) =>
-    d === "any" ? "שני הכיוונים" : names.directionLabel?.(state.lineId, d) ?? "";
-  const options: { id: WizardDirection; title: string; description: string }[] = [
-    { id: "any", title: "שני הכיוונים", description: "כל חצייה של הקו נחשבת." },
-    { id: "a_to_b", title: labelFor("a_to_b") || "כיוון אחד", description: "רק מעבר בכיוון הזה." },
-    { id: "b_to_a", title: labelFor("b_to_a") || "כיוון אחד", description: "רק מעבר בכיוון הזה." },
-  ];
-  return (
-    <section className="space-y-3" data-testid="wizard-direction">
-      <h3 className="text-sm font-medium text-ink">איזה כיוון צריך להפעיל את החוק?</h3>
-      <ul className="grid gap-2 sm:grid-cols-3">
-        {options.map((o) => (
-          <li key={o.id}>
-            <ChoiceCard
-              title={o.title}
-              description={o.description}
-              selected={state.direction === o.id}
-              onClick={() => update({ direction: o.id })}
-              testId={`wizard-direction-${o.id}`}
-            />
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }

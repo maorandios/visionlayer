@@ -45,11 +45,10 @@ describe("rule wizard UI — universal flow", () => {
   it("zones and lines can be created inline without leaving the wizard", () => {
     const src = read("components/rules/wizard/StepPlace.tsx");
     expect(src).toContain("InlineZoneCreator");
-    expect(src).toContain("InlineLineCreator");
+    expect(src).toContain("PlaceLineSetup");
     expect(src).toContain("PolygonEditor");
-    expect(src).toContain("LineEditor");
     expect(src).toContain("api.zones.create");
-    expect(src).toContain("api.lines.create");
+    expect(read("components/metrics/LineMetricSetup.tsx")).toContain("api.lines.create");
     expect(src).toContain("PlaceDetected");
     expect(src).toContain("כל שדה הראייה");
     expect(src).not.toContain("router.push");
@@ -87,11 +86,14 @@ describe("rule wizard UI — universal flow", () => {
     }
   });
 
-  it("direction choices are human-readable", () => {
-    const src = read("components/rules/wizard/steps-details.tsx");
-    expect(src).toContain('"שני הכיוונים"');
-    expect(src).toContain("names.directionLabel?.(state.lineId, d)");
-    expect(src).toContain("איזה כיוון צריך להפעיל את החוק?");
+  it("line crossing uses visual direction on the camera (not כיוון 1/2)", () => {
+    const place = read("components/rules/wizard/PlaceLineSetup.tsx");
+    expect(place).toContain("LineMetricSetup");
+    expect(place).toContain('variant="rule"');
+    expect(place).not.toContain("כיוון 1");
+    const setup = read("components/metrics/LineMetricSetup.tsx");
+    expect(setup).toContain("line-dir-");
+    expect(setup).not.toContain("showPointNumbers");
   });
 
   it("has no user-facing outcome/action or notification step", () => {

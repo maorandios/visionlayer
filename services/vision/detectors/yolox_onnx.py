@@ -133,12 +133,15 @@ class YoloxOnnxDetector:
         score_threshold: float = DEFAULT_SCORE,
         with_p6: bool = False,
         class_filter: frozenset[str] | None = None,
+        # When True, ignore per-class CLASS_CONF floors (debug / correctness mode).
+        uniform_threshold: bool = False,
     ) -> None:
         self._input_size = input_size
         self._conf = conf_threshold
         self._nms = nms_threshold
         self._score = score_threshold
         self._with_p6 = with_p6
+        self._uniform_threshold = bool(uniform_threshold)
         filt = class_filter if class_filter is not None else PRIMARY_CLASSES
         self._class_filter = frozenset(c for c in filt if c in PRIMARY_CLASSES) or PRIMARY_CLASSES
         self._session = None
@@ -210,6 +213,7 @@ class YoloxOnnxDetector:
             nms_threshold=self._nms,
             score_threshold=self._score,
             class_filter=self._class_filter,
+            uniform_threshold=self._uniform_threshold,
         )
 
 
@@ -314,6 +318,7 @@ def _postprocess(
     nms_threshold: float,
     score_threshold: float,
     class_filter: frozenset[str],
+    uniform_threshold: bool = False,
 ) -> list[RawDetection]:
     """Decode YOLOX decoded output [1, N, 85] or [N, 85] (cx,cy,w,h,obj,cls...)."""
     preds = predictions
@@ -333,7 +338,10 @@ def _postprocess(
     for class_id, name in enumerate(COCO_NAMES):
         if name not in class_filter:
             continue
-        class_floor = max(conf_threshold, score_threshold, CLASS_CONF.get(name, conf_threshold))
+        if uniform_threshold:
+            class_floor = max(conf_threshold, score_threshold)
+        else:
+            class_floor = max(conf_threshold, score_threshold, CLASS_CONF.get(name, conf_threshold))
         class_conf = scores[:, class_id]
         keep = np.where(class_conf >= class_floor)[0]
         if keep.size == 0:

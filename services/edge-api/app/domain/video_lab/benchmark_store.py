@@ -238,6 +238,24 @@ async def latest_successful_run_for_camera(
     return result.scalar_one_or_none()
 
 
+async def latest_successful_run_ids_by_camera(session: AsyncSession) -> dict[str, str]:
+    """Authoritative map camera_id → latest completed analysis run id.
+
+    Shared by camera Activity/Events and the global Events feed so both use the
+    same ``latest_successful_run`` concept (not feed-inferred scoping).
+    """
+    result = await session.execute(
+        select(VideoAnalysisRun)
+        .where(VideoAnalysisRun.status == "completed")
+        .order_by(VideoAnalysisRun.analyzed_at.desc())
+    )
+    out: dict[str, str] = {}
+    for run in result.scalars().all():
+        if run.camera_id not in out:
+            out[run.camera_id] = run.id
+    return out
+
+
 async def set_track_review(
     session: AsyncSession,
     *,

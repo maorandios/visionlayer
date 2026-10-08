@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { t } from "@/i18n/he";
 import { api } from "@/lib/api";
+import { isDevEnvironment } from "@/lib/navigation";
 import type { CameraAiTestStatus } from "@/lib/types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useToast } from "@/providers/ToastProvider";
@@ -45,8 +47,9 @@ export function CameraAiTestBar({
   onRunComplete,
   onStatus,
 }: Props) {
-  const { token } = useAuth();
+  const { token, hub } = useAuth();
   const { showToast } = useToast();
+  const showDebugLink = isDevEnvironment(hub);
   const [status, setStatus] = useState<CameraAiTestStatus | null>(null);
   const [starting, setStarting] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
@@ -167,14 +170,25 @@ export function CameraAiTestBar({
             </p>
           ) : null}
         </div>
-        <Button
-          size="sm"
-          onClick={() => void start()}
-          disabled={running}
-          data-testid="ai-test-start"
-        >
-          {running ? t("aiTestRunning") : t("aiTestCta")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!running && last && showDebugLink ? (
+            <Link
+              href={`/dev/ai-test/${last.id}`}
+              className="text-xs text-accent underline"
+              data-testid="ai-test-show-analysis"
+            >
+              {t("aiTestShowAnalysis")}
+            </Link>
+          ) : null}
+          <Button
+            size="sm"
+            onClick={() => void start()}
+            disabled={running}
+            data-testid="ai-test-start"
+          >
+            {running ? t("aiTestRunning") : t("aiTestCta")}
+          </Button>
+        </div>
       </div>
 
       {gateOpen ? (

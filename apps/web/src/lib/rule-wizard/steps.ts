@@ -69,7 +69,9 @@ export function stepError(state: RuleWizardState, step: StepId): string | null {
       if (state.action === "detected") return null; // full-frame when zoneId is null
       const need = spatialRequirement(state.action, state.countMode);
       if (need === "zone" && !state.zoneId) return "יש לבחור אזור כדי להמשיך.";
-      if (need === "line" && !state.lineId) return "יש לבחור קו כדי להמשיך.";
+      if (need === "line" && !state.lineId) {
+        return "סמנו קו, בחרו כיוון מעבר, ולחצו «שמור והמשך».";
+      }
       return null;
     }
     case "details": {
